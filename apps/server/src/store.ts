@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -43,13 +43,20 @@ export class Store {
   }
 
   createPairingCode(userSub: string): { code: string; expiresAt: string } {
+    const now = Date.now();
+    this.db.prepare(
+      "DELETE FROM pairing_codes WHERE expires_at < ? OR consumed_at IS NOT NULL"
+    ).run(now);
+
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const chars = Array.from(randomBytes(8), (b) => alphabet[b % alphabet.length]!);
-    const code = `${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
-    const expires = Date.now() + 10 * 60_000;
+    const chars = Array.from({ length: 12 }, () => alphabet[randomInt(alphabet.length)]!);
+    const code = `${chars.slice(0, 6).join("")}-${chars.slice(6).join("")}`;
+    const expires = now + 10 * 60_000;
+
     this.db.prepare(
       "INSERT INTO pairing_codes(code_hash,user_sub,expires_at,consumed_at) VALUES(?,?,?,NULL)"
     ).run(hash(code), userSub, expires);
+
     return { code, expiresAt: new Date(expires).toISOString() };
   }
 
@@ -58,7 +65,9 @@ export class Store {
     const row = this.db.prepare(
       "SELECT user_sub,expires_at,consumed_at FROM pairing_codes WHERE code_hash=?"
     ).get(hash(code)) as { user_sub: string; expires_at: number; consumed_at: number | null } | undefined;
+
     if (!row || row.consumed_at !== null || row.expires_at < now) return null;
+
     this.db.prepare("UPDATE pairing_codes SET consumed_at=? WHERE code_hash=?").run(now, hash(code));
     return row.user_sub;
   }
@@ -67,9 +76,11 @@ export class Store {
     const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const now = new Date().toISOString();
+
     this.db.prepare(
       "INSERT INTO devices(id,user_sub,name,token_hash,created_at,last_seen) VALUES(?,?,?,?,?,NULL)"
     ).run(id, userSub, name, hash(token), now);
+
     return { id, token };
   }
 
@@ -77,6 +88,7 @@ export class Store {
     const row = this.db.prepare(
       "SELECT id,user_sub,name,token_hash,created_at,last_seen FROM devices WHERE token_hash=?"
     ).get(hash(token)) as Record<string, unknown> | undefined;
+
     return row ? mapDevice(row) : null;
   }
 
@@ -84,6 +96,7 @@ export class Store {
     const rows = this.db.prepare(
       "SELECT id,user_sub,name,token_hash,created_at,last_seen FROM devices WHERE user_sub=? ORDER BY created_at"
     ).all(userSub) as Record<string, unknown>[];
+
     return rows.map(mapDevice);
   }
 
@@ -91,7 +104,16 @@ export class Store {
     const row = this.db.prepare(
       "SELECT id,user_sub,name,token_hash,created_at,last_seen FROM devices WHERE user_sub=? AND id=?"
     ).get(userSub, id) as Record<string, unknown> | undefined;
+
     return row ? mapDevice(row) : null;
+  }
+
+  deleteDeviceForUser(userSub: string, id: string): boolean {
+    const result = this.db.prepare(
+      "DELETE FROM devices WHERE user_sub=? AND id=?"
+    ).run(userSub, id);
+
+    return Number(result.changes) === 1;
   }
 
   touchDevice(id: string): void {
