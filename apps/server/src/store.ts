@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -64,7 +64,7 @@ export class Store {
   }
 
   createDevice(userSub: string, name: string): { id: string; token: string } {
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const now = new Date().toISOString();
     this.db.prepare(
