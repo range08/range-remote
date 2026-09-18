@@ -11,9 +11,9 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "build": "npm run build -ws",
-    "check": "npm run check -ws",
-    "test": "npm run test -ws --if-present",
+    "build": "npm run build --workspace @range-remote/shared && npm run build --workspace @range-remote/agent && npm run build --workspace @range-remote/server",
+    "check": "npm run build --workspace @range-remote/shared && npm run check --workspace @range-remote/agent && npm run check --workspace @range-remote/server",
+    "test": "npm run build --workspace @range-remote/shared && npm run test --workspace @range-remote/agent && npm run test --workspace @range-remote/server",
     "dev:server": "npm --workspace @range-remote/server run dev",
     "dev:agent": "npm --workspace @range-remote/agent run dev"
   },
