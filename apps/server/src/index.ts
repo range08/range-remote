@@ -11,10 +11,12 @@ import { Store } from "./store.js";
 
 const store = new Store();
 const hub = new AgentHub(store);
+const publicUrl = new URL(config.PUBLIC_BASE_URL);
 
 const app = createMcpExpressApp({
   host: "0.0.0.0",
-  allowedHosts: [new URL(config.PUBLIC_BASE_URL).host, "localhost", "127.0.0.1"]
+  allowedHosts: [publicUrl.hostname, "localhost", "127.0.0.1"],
+  jsonLimit: "1mb"
 });
 
 app.get("/healthz", (_req, res) => {
@@ -42,11 +44,13 @@ app.post("/agent/pair", (req, res) => {
     res.status(400).json({ error: "invalid_request" });
     return;
   }
+
   const userSub = store.consumePairingCode(parsed.data.code);
   if (!userSub) {
     res.status(401).json({ error: "invalid_or_expired_pairing_code" });
     return;
   }
+
   const device = store.createDevice(userSub, parsed.data.name);
   res.json({ deviceId: device.id, deviceToken: device.token });
 });
@@ -63,7 +67,7 @@ const mcpNodeHandler = toNodeHandler(handler);
 const auth = requireBearerAuth({
   verifier: tokenVerifier,
   requiredScopes: [config.AUTH_REQUIRED_SCOPE],
-  resourceMetadataUrl: new URL(protectedResourceMetadataUrl)
+  resourceMetadataUrl: protectedResourceMetadataUrl
 });
 
 app.all("/mcp", auth, (req, res) => {
