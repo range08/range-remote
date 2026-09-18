@@ -14,7 +14,7 @@ const EnvSchema = z.object({
 
 export const config = EnvSchema.parse(process.env);
 
-export const mcpResource = new URL("/mcp", config.PUBLIC_BASE_URL).toString();
+export const mcpResource = new URL("/", config.PUBLIC_BASE_URL).toString();
 export const protectedResourceMetadataUrl = new URL(
   "/.well-known/oauth-protected-resource",
   config.PUBLIC_BASE_URL
