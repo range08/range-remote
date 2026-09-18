@@ -1,0 +1,25 @@
+{
+  "name": "range-remote",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "npm run build -ws",
+    "check": "npm run check -ws",
+    "test": "npm run test -ws --if-present",
+    "dev:server": "npm --workspace @range-remote/server run dev",
+    "dev:agent": "npm --workspace @range-remote/agent run dev"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^6.0.0",
+    "vitest": "^3.2.4"
+  }
+}
