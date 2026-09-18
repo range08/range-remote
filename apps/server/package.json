@@ -1,0 +1,26 @@
+{
+  "name": "@range-remote/server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/express": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@range-remote/shared": "0.1.0",
+    "dotenv": "^17.2.2",
+    "jose": "^6.1.0",
+    "tsx": "^4.20.6",
+    "ws": "^8.18.3",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": { "@types/ws": "^8.18.1" }
+}
