@@ -6,7 +6,9 @@ import { config } from "./config.js";
 import type { Store } from "./store.js";
 
 type Pending = {
+  deviceId: string;
   resolve: (value: RpcResponse) => void;
+  reject: (error: Error) => void;
   timer: NodeJS.Timeout;
 };
 
@@ -29,7 +31,18 @@ export class AgentHub {
     return this.sockets.get(deviceId)?.readyState === WebSocket.OPEN;
   }
 
-  async call(deviceId: string, kind: RpcRequest["kind"], params: Record<string, unknown>): Promise<unknown> {
+  disconnect(deviceId: string): void {
+    const ws = this.sockets.get(deviceId);
+    this.sockets.delete(deviceId);
+    if (ws && ws.readyState === WebSocket.OPEN) ws.close(1000, "Device removed");
+    this.rejectPendingForDevice(deviceId, new Error("Device was removed"));
+  }
+
+  async call(
+    deviceId: string,
+    kind: RpcRequest["kind"],
+    params: Record<string, unknown>
+  ): Promise<unknown> {
     const ws = this.sockets.get(deviceId);
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error("Device is offline");
 
@@ -43,7 +56,9 @@ export class AgentHub {
       }, config.AGENT_REQUEST_TIMEOUT_MS);
 
       this.pending.set(id, {
+        deviceId,
         timer,
+        reject,
         resolve: (response) => {
           if (!response.ok) reject(new Error(response.error ?? "Device operation failed"));
           else resolve(response.result);
@@ -72,6 +87,7 @@ export class AgentHub {
 
     const previous = this.sockets.get(device.id);
     if (previous && previous.readyState === WebSocket.OPEN) previous.close(1000, "Replaced");
+
     this.sockets.set(device.id, ws);
     this.store.touchDevice(device.id);
 
@@ -80,6 +96,7 @@ export class AgentHub {
         const response = RpcResponseSchema.parse(JSON.parse(raw.toString()));
         const pending = this.pending.get(response.id);
         if (!pending) return;
+
         clearTimeout(pending.timer);
         this.pending.delete(response.id);
         pending.resolve(response);
@@ -89,11 +106,26 @@ export class AgentHub {
     });
 
     ws.on("close", () => {
-      if (this.sockets.get(device.id) === ws) this.sockets.delete(device.id);
+      if (this.sockets.get(device.id) === ws) {
+        this.sockets.delete(device.id);
+        this.rejectPendingForDevice(device.id, new Error("Device disconnected"));
+      }
     });
 
     ws.on("error", () => {
-      if (this.sockets.get(device.id) === ws) this.sockets.delete(device.id);
+      if (this.sockets.get(device.id) === ws) {
+        this.sockets.delete(device.id);
+        this.rejectPendingForDevice(device.id, new Error("Device connection failed"));
+      }
     });
+  }
+
+  private rejectPendingForDevice(deviceId: string, error: Error): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.deviceId !== deviceId) continue;
+      clearTimeout(pending.timer);
+      this.pending.delete(id);
+      pending.reject(error);
+    }
   }
 }
