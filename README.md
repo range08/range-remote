@@ -1,2 +1,90 @@
-# range-remote
-Open-source remote filesystem and shell bridge for ChatGPT via MCP
+# Range Remote
+
+Range Remote is an open-source remote MCP service designed for ChatGPT plugins. It lets a user connect a computer or server through an outbound-only agent and then use narrowly described MCP tools for filesystem inspection, file editing, Git inspection, and optional shell execution.
+
+## Architecture
+
+```text
+ChatGPT / Codex
+      |
+      | OAuth 2.1 + MCP over HTTPS
+      v
+Range Remote relay
+      |
+      | authenticated WebSocket
+      v
+Range Remote agent
+      |
+      +-- allowed filesystem roots
+      +-- optional shell
+```
+
+The relay never needs inbound access to the user's device. The agent opens the connection outward and enforces local policy before every operation.
+
+## Security defaults
+
+- Agent access is restricted to explicitly configured filesystem roots.
+- Sensitive files such as `.env`, SSH keys, cloud credentials, and private keys are denied by default.
+- Shell execution is disabled unless the user explicitly enables it locally.
+- File reads/writes and command output have size limits.
+- Path checks resolve symlinks to prevent escaping allowed roots.
+- Device tokens are generated once and stored only as SHA-256 hashes on the relay.
+- MCP access requires OAuth 2.1 bearer tokens.
+- Tools advertise `readOnlyHint`, `destructiveHint`, and `openWorldHint` to ChatGPT.
+
+## Repository layout
+
+- `apps/server`: public HTTPS MCP relay and device WebSocket gateway.
+- `apps/agent`: local/remote device agent.
+- `packages/shared`: RPC schemas shared by relay and agent.
+- `docs/SUBMISSION.md`: OpenAI plugin submission checklist.
+- `PRIVACY.md`: privacy policy draft for publication.
+
+## Local development
+
+Requirements: Node.js 24.15+.
+
+```bash
+npm install
+npm run build
+npm test
+```
+
+Copy `.env.example` to `.env`, configure an OAuth provider, then start the relay:
+
+```bash
+npm run dev:server
+```
+
+Pair an agent:
+
+```bash
+npm run dev:agent -- pair \
+  --server http://127.0.0.1:8787 \
+  --code ABCD-EFGH \
+  --name my-device \
+  --root "$HOME/projects"
+```
+
+Shell access requires an explicit local opt-in:
+
+```bash
+npm run dev:agent -- pair \
+  --server http://127.0.0.1:8787 \
+  --code ABCD-EFGH \
+  --name my-device \
+  --root "$HOME/projects" \
+  --allow-shell
+```
+
+Then keep the agent connected:
+
+```bash
+npm run dev:agent -- start
+```
+
+## Production
+
+The MCP endpoint is `/mcp`. Production deployments must use HTTPS and a stable hostname. For ChatGPT publication, configure OAuth 2.1, host a privacy policy, verify the MCP domain, prepare review credentials, and keep a review device online.
+
+See `docs/SUBMISSION.md`.
