@@ -19,12 +19,22 @@ export const tokenVerifier: OAuthTokenVerifier = {
         ? payload.scope.split(/\s+/).filter(Boolean)
         : [];
 
+      const azp = payload.azp;
+      const clientIdClaim = payload.client_id;
+      const clientId =
+        typeof azp === "string"
+          ? azp
+          : typeof clientIdClaim === "string"
+            ? clientIdClaim
+            : "unknown-oauth-client";
+
       return {
         token,
-        clientId: payload.sub,
+        clientId,
         scopes,
         expiresAt: payload.exp,
-        resource: new URL(mcpResource)
+        resource: new URL(mcpResource),
+        extra: { userSub: payload.sub }
       };
     } catch (error) {
       throw new OAuthError(
