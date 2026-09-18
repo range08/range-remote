@@ -26,7 +26,7 @@ export const RpcResponseSchema = z.object({
 export type RpcResponse = z.infer<typeof RpcResponseSchema>;
 
 export const PairRequestSchema = z.object({
-  code: z.string().regex(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/),
+  code: z.string().regex(/^[A-Z2-9]{6}-[A-Z2-9]{6}$/),
   name: z.string().trim().min(1).max(80)
 });
 
