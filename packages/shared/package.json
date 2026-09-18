@@ -1,0 +1,13 @@
+{
+  "name": "@range-remote/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": { ".": "./dist/index.js" },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "zod": "^4.2.0" }
+}
