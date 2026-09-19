@@ -335,6 +335,7 @@ for required in {
     "list_mcp_servers",
     "list_mcp_tools",
     "call_mcp_tool",
+    "get_usage_statistics",
 }:
     assert required in tool_names, (required, tool_names)
 for tool in tools_list:
@@ -377,6 +378,12 @@ profile_conn.close()
 profile_result = profile_json.get("result", {})
 profile_structured = profile_result.get("structuredContent", {})
 assert isinstance(profile_structured.get("id"), str) and profile_structured["id"].strip(), profile_result
+
+status, _, usage_body = request("GET", "/usage")
+assert status == 200, (status, usage_body[:500])
+assert b"Range Remote Usage" in usage_body, usage_body[:500]
+assert b"Unlimited" in usage_body, usage_body[:500]
+assert b"profile" in usage_body, usage_body[:1000]
 
 print(json.dumps({
     "dcr": True,

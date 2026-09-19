@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { createMcpExpressApp, requireBearerAuth } from "@modelcontextprotocol/express";
 import { toNodeHandler } from "@modelcontextprotocol/node";
@@ -17,7 +18,7 @@ const pairRateLimit = fixedWindowRateLimit(20, 60_000);
 
 const app = createMcpExpressApp({
   host: "0.0.0.0",
-  allowedHosts: [publicUrl.hostname, "localhost", "127.0.0.1"],
+  allowedHosts: [publicUrl.hostname, "range-remote", "localhost", "127.0.0.1"],
   jsonLimit: "1mb"
 });
 app.disable("x-powered-by");
@@ -30,6 +31,21 @@ app.get("/privacy", (_req, res) => {
   res.type("text/plain").send(
     "Range Remote privacy policy: https://github.com/range08/range-remote/blob/main/PRIVACY.md"
   );
+});
+
+app.get("/internal/usage", (req, res) => {
+  const supplied = req.header("x-range-remote-internal-token") ?? "";
+  if (!secureEqual(supplied, config.INTERNAL_API_TOKEN)) {
+    res.sendStatus(404);
+    return;
+  }
+  const userSub = typeof req.query.userSub === "string" ? req.query.userSub : "";
+  if (!userSub || userSub.length > 200) {
+    res.status(400).json({ error: "invalid_user" });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(store.getUsageStats(userSub));
 });
 
 
@@ -71,7 +87,7 @@ const handler = createMcpHandler(
     if (typeof userSub !== "string" || userSub.length === 0) {
       throw new Error("Verified user identity missing");
     }
-    return buildMcpServer(userSub, store, hub);
+    return buildMcpServer(userSub, authInfo.clientId, store, hub);
   },
   { responseMode: "json" }
 );
@@ -102,3 +118,9 @@ async function shutdown() {
 
 process.on("SIGTERM", () => void shutdown());
 process.on("SIGINT", () => void shutdown());
+
+function secureEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+}

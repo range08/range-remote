@@ -37,7 +37,12 @@ function errorResult(error: unknown) {
   };
 }
 
-export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): McpServer {
+export function buildMcpServer(
+  userSub: string,
+  clientId: string,
+  store: Store,
+  hub: AgentHub
+): McpServer {
   const server = new McpServer(
     { name: "Range Remote", version: "0.1.0" },
     {
@@ -46,7 +51,21 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
     }
   );
 
-  const tools = createOpenAiToolRegistry(server, securitySchemes);
+  const tools = createOpenAiToolRegistry(
+    server,
+    securitySchemes,
+    ({ name, deviceId, durationMs, success }) => {
+      if (name === "get_usage_statistics") return;
+      store.recordToolUsage({
+        userSub,
+        clientId,
+        toolName: name,
+        ...(deviceId ? { deviceId } : {}),
+        durationMs,
+        success
+      });
+    }
+  );
 
   const profileSchema = z.object({
     id: z.string().min(1).regex(/\S/).describe(
@@ -318,6 +337,18 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
       arguments: toolArguments,
       ...(cwd === undefined ? {} : { cwd })
     }));
+
+  tools.register("get_usage_statistics", {
+    title: "Get usage statistics",
+    description: "Returns this account's Range Remote tool-call usage, success/failure rate, performance summary, top tools, 30-day activity, and recent tool activity. This analytics query does not count itself.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+      idempotentHint: true
+    },
+    _meta: meta("Reading usage…", "Usage ready")
+  }, async () => text(store.getUsageStats(userSub)));
 
   tools.installListCompatibility();
   return server;
