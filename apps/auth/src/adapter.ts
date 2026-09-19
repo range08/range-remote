@@ -97,6 +97,23 @@ export class SqliteAdapter implements Adapter {
       db.prepare("DELETE FROM oidc WHERE model=? AND id=?").run(this.model, row.id);
       return undefined;
     }
-    return JSON.parse(row.payload) as AdapterPayload;
+    const payload = JSON.parse(row.payload) as AdapterPayload;
+    return this.model === "Client" ? ensureRefreshGrant(payload) : payload;
   }
+}
+
+function ensureRefreshGrant(payload: AdapterPayload): AdapterPayload {
+  const client = payload as AdapterPayload & { grant_types?: unknown };
+  const grants = Array.isArray(client.grant_types)
+    ? client.grant_types.filter((grant): grant is string => typeof grant === "string")
+    : ["authorization_code"];
+
+  if (!grants.includes("authorization_code") || grants.includes("refresh_token")) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    grant_types: [...grants, "refresh_token"]
+  };
 }

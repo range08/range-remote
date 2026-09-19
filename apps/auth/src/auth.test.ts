@@ -62,6 +62,22 @@ describe("authorization persistence", () => {
     expect(statSync(jwksPath).mode & 0o777).toBe(0o600);
   });
 
+  it("upgrades existing authorization-code clients to allow refresh tokens", async () => {
+    const clients = new SqliteAdapter("Client");
+    await clients.upsert("legacy-client", {
+      client_id: "legacy-client",
+      redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"],
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none"
+    });
+
+    const client = await clients.find("legacy-client") as {
+      grant_types?: string[];
+    } | undefined;
+    expect(client?.grant_types).toEqual(["authorization_code", "refresh_token"]);
+  });
+
   it("persists and consumes OIDC adapter payloads", async () => {
     const adapter = new SqliteAdapter("AuthorizationCode");
     await adapter.upsert("code-1", { grantId: "grant-1", uid: "uid-1", foo: "bar" }, 60);
