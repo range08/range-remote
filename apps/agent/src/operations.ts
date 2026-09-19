@@ -51,17 +51,36 @@ export async function execute(request: RpcRequest, config: AgentConfig): Promise
       return { path, bytes, overwritten: overwrite };
     }
 
-    case "git_status":
-      return runGit(config, asString(request.params.cwd), ["status", "--short", "--branch"]);
+    case "git_status": {
+      const cwd = asString(request.params.cwd);
+      return runGit(
+        config,
+        cwd,
+        config.unrestricted
+          ? ["status", "--short", "--branch"]
+          : ["status", "--short", "--branch", "--", "."]
+      );
+    }
 
     case "git_diff": {
+      if (!config.unrestricted && !config.allowSensitiveFiles) {
+        throw new Error(
+          "Git diff is disabled by local policy because tracked diffs can expose sensitive file contents"
+        );
+      }
       const cwd = asString(request.params.cwd);
       const staged = asBoolean(request.params.staged, false);
       const maxBytes = Math.min(asNumber(request.params.maxBytes, 262_144), config.maxCommandOutputBytes);
       return runGit(
         config,
         cwd,
-        ["diff", "--no-ext-diff", "--no-textconv", ...(staged ? ["--cached"] : [])],
+        [
+          "diff",
+          "--no-ext-diff",
+          "--no-textconv",
+          ...(staged ? ["--cached"] : []),
+          ...(config.unrestricted ? [] : ["--", "."])
+        ],
         maxBytes
       );
     }

@@ -8,7 +8,7 @@ Device-side permissions are selected locally. Restricted mode provides applicati
 
 ## Defaults
 
-- Restricted mode requires `allowShell` for shell access and blocks common sensitive paths by default.
+- Restricted mode requires `allowShell` for shell access and blocks common sensitive paths by default. `git_diff` is disabled unless sensitive-file access is explicitly enabled locally, because tracked diffs can contain credential contents; restricted Git status/diff requests are scoped to the requested working subtree.
 - `unrestricted` can only be enabled in local agent configuration or during local pairing. It bypasses allowed-root and sensitive-file checks, enables shell execution, and preserves the agent process environment for child commands.
 - In unrestricted mode, the effective security boundary is the operating-system account that runs the agent; UAC/sudo and filesystem ACLs still apply.
 - No remote operation can change the local agent policy.

@@ -17,11 +17,7 @@ const EnvSchema = z.object({
   AGENT_WS_HEARTBEAT_MS: z.coerce.number().int().min(10000).max(120000).default(30000),
   USER_DEVICE_REQUESTS_PER_MINUTE: z.coerce.number().int().min(10).max(10000).default(300),
   USER_CONCURRENT_DEVICE_REQUESTS: z.coerce.number().int().min(1).max(128).default(16),
-  MAX_DEVICES_PER_USER: z.coerce.number().int().min(1).max(1000).default(100),
-  OPENAI_APPS_CHALLENGE: z.preprocess(
-    (value) => value === "" ? undefined : value,
-    z.string().min(1).optional()
-  )
+  MAX_DEVICES_PER_USER: z.coerce.number().int().min(1).max(1000).default(100)
 });
 
 export const config = EnvSchema.parse(process.env);
