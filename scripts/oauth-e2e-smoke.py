@@ -324,7 +324,18 @@ else:
 tools_conn.close()
 tools_list = tools_json.get("result", {}).get("tools", [])
 tool_names = {tool.get("name") for tool in tools_list}
-for required in {"profile", "list_devices", "read_file", "write_file", "run_command"}:
+for required in {
+    "profile",
+    "list_devices",
+    "read_file",
+    "write_file",
+    "run_command",
+    "list_skills",
+    "read_skill",
+    "list_mcp_servers",
+    "list_mcp_tools",
+    "call_mcp_tool",
+}:
     assert required in tool_names, (required, tool_names)
 for tool in tools_list:
     assert tool.get("securitySchemes"), tool

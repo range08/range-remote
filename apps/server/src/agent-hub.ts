@@ -57,7 +57,8 @@ export class AgentHub {
   async call(
     deviceId: string,
     kind: RpcRequest["kind"],
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
+    timeoutMs = config.AGENT_REQUEST_TIMEOUT_MS
   ): Promise<unknown> {
     const ws = this.sockets.get(deviceId);
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error("Device is offline");
@@ -78,7 +79,7 @@ export class AgentHub {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error("Device request timed out"));
-      }, config.AGENT_REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
 
       this.pending.set(id, {
         deviceId,

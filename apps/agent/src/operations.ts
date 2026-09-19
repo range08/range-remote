@@ -3,6 +3,7 @@ import { lstatSync, readdirSync, readFileSync, writeFileSync, existsSync } from 
 import { hostname, platform, release, arch } from "node:os";
 import { promisify } from "node:util";
 import type { AgentConfig, RpcRequest } from "@range-remote/shared";
+import { callMcpTool, listMcpServers, listMcpTools, listSkills, readSkill } from "./codex.js";
 import { assertAllowedPath } from "./policy.js";
 
 const execFileAsync = promisify(execFile);
@@ -94,6 +95,27 @@ export async function execute(request: RpcRequest, config: AgentConfig): Promise
       const timeoutSeconds = Math.min(asNumber(request.params.timeoutSeconds, 30), config.maxCommandSeconds);
       return runShell(command, cwd, timeoutSeconds, config.maxCommandOutputBytes, executionEnvironment(config));
     }
+
+    case "list_skills":
+      return listSkills(config, asOptionalString(request.params.cwd));
+
+    case "read_skill":
+      return readSkill(config, asString(request.params.path));
+
+    case "list_mcp_servers":
+      return listMcpServers(config, asOptionalString(request.params.cwd));
+
+    case "list_mcp_tools":
+      return listMcpTools(config, asString(request.params.server), asOptionalString(request.params.cwd));
+
+    case "call_mcp_tool":
+      return callMcpTool(
+        config,
+        asString(request.params.server),
+        asString(request.params.tool),
+        asRecord(request.params.arguments),
+        asOptionalString(request.params.cwd)
+      );
   }
 }
 
@@ -160,6 +182,18 @@ function sanitizedEnvironment(): NodeJS.ProcessEnv {
 function asString(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) throw new Error("Expected non-empty string");
   return value;
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value === undefined) return {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Expected object");
+  }
+  return value as Record<string, unknown>;
 }
 
 function asNumber(value: unknown, fallback: number): number {

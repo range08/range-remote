@@ -15,6 +15,7 @@ function config(root: string): AgentConfig {
     allowedRoots: [root],
     allowShell: false,
     allowSensitiveFiles: false,
+    allowMcp: false,
     maxReadBytes: 1024,
     maxWriteBytes: 1024,
     maxCommandOutputBytes: 1024,

@@ -9,7 +9,12 @@ export const RpcRequestSchema = z.object({
     "write_file",
     "git_status",
     "git_diff",
-    "run_command"
+    "run_command",
+    "list_skills",
+    "read_skill",
+    "list_mcp_servers",
+    "list_mcp_tools",
+    "call_mcp_tool"
   ]),
   params: z.record(z.string(), z.unknown())
 });
@@ -41,6 +46,7 @@ export const AgentConfigSchema = z.object({
   allowedRoots: z.array(z.string().min(1)).default([]),
   allowShell: z.boolean().default(false),
   allowSensitiveFiles: z.boolean().default(false),
+  allowMcp: z.boolean().default(false),
   maxReadBytes: z.number().int().positive().max(16 * 1024 * 1024),
   maxWriteBytes: z.number().int().positive().max(16 * 1024 * 1024),
   maxCommandOutputBytes: z.number().int().positive().max(16 * 1024 * 1024),
