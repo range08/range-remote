@@ -65,6 +65,7 @@ const providerConfig: Configuration = {
       return true;
     }
   },
+  responseTypes: ["code"],
   scopes: ["openid", "email", "profile", "offline_access", "remote:use"],
   ttl: {
     AccessToken: 3600,

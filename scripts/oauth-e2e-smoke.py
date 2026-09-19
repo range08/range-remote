@@ -55,6 +55,14 @@ def hidden_csrf(html):
         raise RuntimeError("CSRF token not found")
     return m.group(1).decode()
 
+status, _, body = request("GET", "/.well-known/openid-configuration")
+assert status == 200, (status, body[:500])
+discovery = json.loads(body)
+assert discovery["response_types_supported"] == ["code"], discovery
+assert "implicit" not in discovery.get("grant_types_supported", []), discovery
+assert "authorization_code" in discovery.get("grant_types_supported", []), discovery
+assert "refresh_token" in discovery.get("grant_types_supported", []), discovery
+
 username = "smoke-" + secrets.token_hex(4)
 email = username + "@example.com"
 password = secrets.token_urlsafe(24)
