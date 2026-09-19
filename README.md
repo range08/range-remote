@@ -52,6 +52,14 @@ Restricted mode still applies the existing allowed-root policy to skill and Code
 
 Interactive downstream OAuth and Codex's `http_headers_helper` are not bridged yet. Codex remote-executor MCP placement (`experimental_environment = "remote"` and `env_vars` entries with `source = "remote"`) is also rejected explicitly because the paired-device bridge has no Codex remote-executor context. Servers using OAuth need a locally available bearer token/header configuration or will return an explicit authentication error.
 
+## Usage dashboard
+
+Authenticated users can open `/usage` on the public Range Remote host to see private usage analytics for their own account. The dashboard shows tool calls for the current UTC calendar month, today's calls, all-time calls, success rate, average latency, a 30-day activity chart, top tools, and recent tool activity. Range Remote does not impose a monthly usage quota; the dashboard labels the plan as `Unlimited` rather than presenting an artificial limit.
+
+The same data is available to MCP clients through the read-only `get_usage_statistics` tool. The statistics query does not count itself. Analytics persist in the relay SQLite database and contain only the tool name, success/failure result, execution duration, timestamp, OAuth client identifier, and targeted device identifier when applicable. Tool arguments, file paths, command text, outputs, and returned file contents are not stored as usage analytics.
+
+The browser dashboard uses the existing Range Remote account credentials. A signed HTTP-only dashboard session is also issued after a successful OAuth login. The authorization service reads usage through an internal-only relay endpoint protected by `INTERNAL_API_TOKEN`; the gateway does not expose that endpoint publicly. Existing installations must set a long random `INTERNAL_API_TOKEN` before deploying this feature.
+
 ## Security defaults
 
 - Restricted mode confines filesystem tools to explicitly configured roots; unrestricted mode intentionally removes this application-level boundary.

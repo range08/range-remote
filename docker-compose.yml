@@ -12,6 +12,8 @@ services:
       AUTH_JWKS_PATH: "${AUTH_JWKS_PATH:-/app/data/jwks.json}"
       AUTH_COOKIE_KEYS: "${AUTH_COOKIE_KEYS}"
       AUTH_ALLOW_REGISTRATION: "${AUTH_ALLOW_REGISTRATION:-false}"
+      MCP_INTERNAL_URL: "${MCP_INTERNAL_URL:-http://range-remote:8787}"
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN}"
     volumes:
       - range_remote_auth_data:/app/data
     networks:
@@ -48,6 +50,7 @@ services:
       AUTH_AUDIENCE: "${AUTH_AUDIENCE}"
       AUTH_JWKS_URL: "http://range-remote-auth:8790/jwks"
       AUTH_REQUIRED_SCOPE: "${AUTH_REQUIRED_SCOPE:-remote:use}"
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN}"
       AGENT_REQUEST_TIMEOUT_MS: "${AGENT_REQUEST_TIMEOUT_MS:-30000}"
       MCP_AGENT_REQUEST_TIMEOUT_MS: "${MCP_AGENT_REQUEST_TIMEOUT_MS:-300000}"
       MAX_PENDING_AGENT_REQUESTS: "${MAX_PENDING_AGENT_REQUESTS:-256}"

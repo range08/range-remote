@@ -1,6 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
+export type ToolCallObservation = {
+  name: string;
+  deviceId?: string;
+  durationMs: number;
+  success: boolean;
+};
+
 export type OAuthSecurityScheme = {
   type: "oauth2";
   scopes: string[];
@@ -34,7 +41,8 @@ type ToolDescriptor = {
 
 export function createOpenAiToolRegistry(
   server: McpServer,
-  securitySchemes: OAuthSecurityScheme[]
+  securitySchemes: OAuthSecurityScheme[],
+  onToolCall?: (observation: ToolCallObservation) => void
 ) {
   const descriptors: ToolDescriptor[] = [];
 
@@ -58,7 +66,39 @@ export function createOpenAiToolRegistry(
         annotations: config.annotations,
         _meta: meta
       } as any,
-      handler as any
+      (async (args: unknown) => {
+        const startedAt = performance.now();
+        let success = false;
+        try {
+          const result = await handler(args);
+          success = !(
+            typeof result === "object" &&
+            result !== null &&
+            "isError" in result &&
+            result.isError === true
+          );
+          return result;
+        } finally {
+          if (onToolCall) {
+            try {
+              const record =
+                typeof args === "object" && args !== null && !Array.isArray(args)
+                  ? args as Record<string, unknown>
+                  : {};
+              onToolCall({
+                name,
+                ...(typeof record.device === "string"
+                  ? { deviceId: record.device }
+                  : {}),
+                durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+                success
+              });
+            } catch {
+              // Usage analytics must never break the requested tool call.
+            }
+          }
+        }
+      }) as any
     );
 
     const inputSchema = config.inputSchema

@@ -9,6 +9,7 @@ const EnvSchema = z.object({
   AUTH_AUDIENCE: z.string().url(),
   AUTH_JWKS_URL: z.string().url(),
   AUTH_REQUIRED_SCOPE: z.string().min(1).default("remote:use"),
+  INTERNAL_API_TOKEN: z.string().min(32).optional(),
   AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   MCP_AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(300000),
   MAX_PENDING_AGENT_REQUESTS: z.coerce.number().int().min(16).max(4096).default(256),
@@ -21,7 +22,14 @@ const EnvSchema = z.object({
   MAX_DEVICES_PER_USER: z.coerce.number().int().min(1).max(1000).default(100)
 });
 
-export const config = EnvSchema.parse(process.env);
+const parsed = EnvSchema.parse(process.env);
+if ((!parsed.INTERNAL_API_TOKEN || parsed.INTERNAL_API_TOKEN.startsWith("replace-with")) && process.env.NODE_ENV !== "test") {
+  throw new Error("INTERNAL_API_TOKEN must be set to a private random value outside tests");
+}
+export const config = {
+  ...parsed,
+  INTERNAL_API_TOKEN: parsed.INTERNAL_API_TOKEN ?? "test-only-internal-token-00000000"
+};
 
 export const mcpResource = new URL(config.PUBLIC_BASE_URL).origin;
 export const protectedResourceMetadataUrl = new URL(

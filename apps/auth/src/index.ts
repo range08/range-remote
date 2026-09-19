@@ -13,8 +13,12 @@ import {
   homePage,
   interactionSubmitGuardScript,
   loginPage,
-  registerPage
+  registerPage,
+  usageLoginPage,
+  usagePage
 } from "./html.js";
+import { createDashboardSession, readDashboardSession } from "./dashboard-session.js";
+import { fetchUsageStats } from "./usage.js";
 import { findUser, registerUser, verifyUser } from "./users.js";
 
 const providerConfig: Configuration = {
@@ -146,6 +150,70 @@ app.get("/auth/ui.js", (_req, res) => {
   res.type("application/javascript").send(interactionSubmitGuardScript);
 });
 
+app.get("/usage", async (req, res) => {
+  const session = readDashboardSession(
+    cookie(req, "rr_dashboard") ?? "",
+    config.cookieKeys
+  );
+  const user = session ? findUser(session.userSub) : null;
+  if (!user) {
+    const csrf = issueCsrf(res);
+    res.setHeader("Cache-Control", "no-store");
+    res.type("html").send(usageLoginPage(csrf));
+    return;
+  }
+
+  try {
+    const stats = await fetchUsageStats(user.id);
+    const csrf = issueCsrf(res);
+    res.setHeader("Cache-Control", "no-store");
+    res.type("html").send(usagePage(user.username, csrf, stats));
+  } catch (error) {
+    console.error("usage dashboard error", error);
+    const csrf = issueCsrf(res);
+    res.status(503).setHeader("Cache-Control", "no-store");
+    res.type("html").send(usageLoginPage(
+      csrf,
+      "Usage statistics are temporarily unavailable. Please try again."
+    ));
+  }
+});
+
+app.post("/usage/login", loginRateLimit, formBody, (req, res) => {
+  if (!validCsrf(req, String(req.body.csrf ?? ""))) {
+    res.status(403).send("Invalid CSRF token");
+    return;
+  }
+  const user = verifyUser(
+    String(req.body.login ?? ""),
+    String(req.body.password ?? "")
+  );
+  if (!user) {
+    const csrf = issueCsrf(res);
+    res.status(401).type("html").send(usageLoginPage(
+      csrf,
+      "Invalid username/email or password"
+    ));
+    return;
+  }
+  issueDashboardSession(res, user.id);
+  res.redirect(303, "/usage");
+});
+
+app.post("/usage/logout", formBody, (req, res) => {
+  if (!validCsrf(req, String(req.body.csrf ?? ""))) {
+    res.status(403).send("Invalid CSRF token");
+    return;
+  }
+  res.clearCookie("rr_dashboard", {
+    secure: true,
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/"
+  });
+  res.redirect(303, "/usage");
+});
+
 app.use("/reg", dcrRateLimit);
 
 app.get("/register", (req, res) => {
@@ -235,6 +303,7 @@ app.post("/interaction/:uid/login", loginRateLimit, formBody, async (req, res, n
       return;
     }
 
+    issueDashboardSession(res, user.id);
     await provider.interactionFinished(req, res, {
       login: { accountId: user.id, amr: ["pwd"] }
     }, { mergeWithLastSubmission: false });
@@ -312,6 +381,20 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(config.port, "0.0.0.0", () => {
   console.log(`Range Remote authorization server listening on :${config.port}`);
 });
+
+function issueDashboardSession(res: Response, userSub: string): void {
+  res.cookie(
+    "rr_dashboard",
+    createDashboardSession(userSub, config.cookieKeys[0]!),
+    {
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60_000,
+      path: "/"
+    }
+  );
+}
 
 function issueCsrf(res: Response): string {
   const token = randomBytes(24).toString("base64url");

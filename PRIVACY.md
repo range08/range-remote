@@ -15,9 +15,10 @@ The authorization service stores:
 The relay stores:
 - the authenticated account subject identifier;
 - paired device identifiers, user-selected device names, and connection status;
-- short-lived pairing codes and hashed device bearer tokens.
+- short-lived pairing codes and hashed device bearer tokens;
+- usage analytics for each MCP tool call: tool name, success/failure status, execution duration, time, OAuth client identifier, and the paired device identifier when a tool targets a device.
 
-While a tool runs, the relay processes the tool arguments and the corresponding device response. The reference implementation does not persist file contents, command output, or ordinary tool response payloads after returning the response to ChatGPT.
+While a tool runs, the relay processes the tool arguments and the corresponding device response. The reference implementation does not persist file contents, command text, file paths, MCP tool arguments, command output, or ordinary tool response payloads in usage analytics after returning the response to ChatGPT.
 
 ## Credentials and tokens
 
@@ -39,6 +40,8 @@ The reference implementation uses these maximum lifetimes for authorization arti
 - grants: 14 days.
 
 Pairing codes expire automatically after 10 minutes. Device metadata remains until the user removes the device. The `remove_device` tool removes one device, and `remove_all_devices` removes all paired devices and outstanding pairing codes for the authenticated account.
+
+Usage analytics are retained in the relay database so the authenticated user can view monthly, daily, all-time, success-rate, latency, and recent-activity statistics at `/usage` or through the read-only `get_usage_statistics` MCP tool. Usage statistics do not impose a quota in the reference implementation.
 
 Authentication account records and dynamically registered OAuth client records remain until they are removed as part of account or service administration. Operational logs should avoid tool payloads and secrets and should be retained only as needed for security and reliability.
 

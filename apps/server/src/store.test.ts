@@ -70,3 +70,80 @@ describe("Store", () => {
   });
 
 });
+
+describe("usage analytics", () => {
+  it("aggregates monthly, daily, tool, latency, and recent usage without payloads", () => {
+    const dir = mkdtempSync(join(tmpdir(), "range-remote-usage-"));
+    const store = new Store(join(dir, "db.sqlite"));
+    const device = store.createDevice("user-1", "workstation");
+    const now = Date.parse("2026-09-19T12:00:00.000Z");
+
+    store.recordToolUsage({
+      userSub: "user-1",
+      clientId: "chatgpt",
+      toolName: "read_file",
+      deviceId: device.id,
+      occurredAt: Date.parse("2026-09-19T10:00:00.000Z"),
+      durationMs: 100,
+      success: true
+    });
+    store.recordToolUsage({
+      userSub: "user-1",
+      clientId: "chatgpt",
+      toolName: "read_file",
+      deviceId: device.id,
+      occurredAt: Date.parse("2026-09-18T10:00:00.000Z"),
+      durationMs: 300,
+      success: false
+    });
+    store.recordToolUsage({
+      userSub: "user-1",
+      clientId: "chatgpt",
+      toolName: "git_status",
+      deviceId: device.id,
+      occurredAt: Date.parse("2026-09-18T11:00:00.000Z"),
+      durationMs: 200,
+      success: true
+    });
+    store.recordToolUsage({
+      userSub: "user-1",
+      toolName: "old_call",
+      occurredAt: Date.parse("2026-08-01T00:00:00.000Z"),
+      durationMs: 50,
+      success: true
+    });
+    store.recordToolUsage({
+      userSub: "user-2",
+      toolName: "not-visible",
+      occurredAt: now,
+      durationMs: 1,
+      success: true
+    });
+
+    const stats = store.getUsageStats("user-1", now);
+    expect(stats.thisMonth).toEqual({
+      calls: 3,
+      successes: 2,
+      failures: 1,
+      successRate: 2 / 3,
+      avgDurationMs: 200
+    });
+    expect(stats.todayCalls).toBe(1);
+    expect(stats.totalCalls).toBe(4);
+    expect(stats.activeDays).toBe(3);
+    expect(stats.topTools[0]).toMatchObject({
+      name: "read_file",
+      calls: 2,
+      successRate: 0.5,
+      avgDurationMs: 200
+    });
+    expect(stats.recent[0]).toMatchObject({
+      toolName: "read_file",
+      deviceName: "workstation",
+      success: true,
+      durationMs: 100
+    });
+    expect(stats.daily.at(-1)).toMatchObject({ date: "2026-09-19", calls: 1 });
+    expect(JSON.stringify(stats)).not.toContain("not-visible");
+  });
+});

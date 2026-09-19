@@ -40,6 +40,20 @@ export class Store {
         consumed_at INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_pairing_user_sub ON pairing_codes(user_sub);
+      CREATE TABLE IF NOT EXISTS tool_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_sub TEXT NOT NULL,
+        client_id TEXT,
+        tool_name TEXT NOT NULL,
+        device_id TEXT,
+        occurred_at INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        success INTEGER NOT NULL CHECK(success IN (0,1))
+      );
+      CREATE INDEX IF NOT EXISTS idx_tool_usage_user_time
+        ON tool_usage(user_sub, occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_tool_usage_user_tool_time
+        ON tool_usage(user_sub, tool_name, occurred_at);
     `);
   }
 
@@ -132,6 +146,173 @@ export class Store {
 
   touchDevice(id: string): void {
     this.db.prepare("UPDATE devices SET last_seen=? WHERE id=?").run(new Date().toISOString(), id);
+  }
+
+  recordToolUsage(input: {
+    userSub: string;
+    clientId?: string;
+    toolName: string;
+    deviceId?: string;
+    occurredAt?: number;
+    durationMs: number;
+    success: boolean;
+  }): void {
+    this.db.prepare(`
+      INSERT INTO tool_usage(
+        user_sub,client_id,tool_name,device_id,occurred_at,duration_ms,success
+      ) VALUES(?,?,?,?,?,?,?)
+    `).run(
+      input.userSub,
+      input.clientId ?? null,
+      input.toolName,
+      input.deviceId ?? null,
+      input.occurredAt ?? Date.now(),
+      Math.max(0, Math.round(input.durationMs)),
+      input.success ? 1 : 0
+    );
+  }
+
+  getUsageStats(userSub: string, now = Date.now()) {
+    const current = new Date(now);
+    const monthStart = Date.UTC(
+      current.getUTCFullYear(),
+      current.getUTCMonth(),
+      1
+    );
+    const todayStart = Date.UTC(
+      current.getUTCFullYear(),
+      current.getUTCMonth(),
+      current.getUTCDate()
+    );
+    const dailyStart = todayStart - 29 * 24 * 60 * 60_000;
+
+    const month = this.db.prepare(`
+      SELECT
+        COUNT(*) AS calls,
+        COALESCE(SUM(success), 0) AS successes,
+        COALESCE(AVG(duration_ms), 0) AS avg_duration_ms
+      FROM tool_usage
+      WHERE user_sub=? AND occurred_at>=?
+    `).get(userSub, monthStart) as Record<string, unknown>;
+
+    const totals = this.db.prepare(`
+      SELECT
+        COUNT(*) AS calls,
+        COUNT(DISTINCT date(occurred_at / 1000, 'unixepoch')) AS active_days,
+        MIN(occurred_at) AS tracking_since
+      FROM tool_usage
+      WHERE user_sub=?
+    `).get(userSub) as Record<string, unknown>;
+
+    const today = this.db.prepare(`
+      SELECT COUNT(*) AS calls
+      FROM tool_usage
+      WHERE user_sub=? AND occurred_at>=?
+    `).get(userSub, todayStart) as Record<string, unknown>;
+
+    const topTools = this.db.prepare(`
+      SELECT
+        tool_name,
+        COUNT(*) AS calls,
+        COALESCE(SUM(success), 0) AS successes,
+        COALESCE(AVG(duration_ms), 0) AS avg_duration_ms
+      FROM tool_usage
+      WHERE user_sub=? AND occurred_at>=?
+      GROUP BY tool_name
+      ORDER BY calls DESC, tool_name ASC
+      LIMIT 12
+    `).all(userSub, monthStart) as Record<string, unknown>[];
+
+    const dailyRows = this.db.prepare(`
+      SELECT
+        date(occurred_at / 1000, 'unixepoch') AS day,
+        COUNT(*) AS calls,
+        SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) AS failures
+      FROM tool_usage
+      WHERE user_sub=? AND occurred_at>=?
+      GROUP BY day
+      ORDER BY day ASC
+    `).all(userSub, dailyStart) as Record<string, unknown>[];
+
+    const recent = this.db.prepare(`
+      SELECT
+        u.occurred_at,
+        u.tool_name,
+        u.device_id,
+        d.name AS device_name,
+        u.duration_ms,
+        u.success
+      FROM tool_usage AS u
+      LEFT JOIN devices AS d
+        ON d.id=u.device_id AND d.user_sub=u.user_sub
+      WHERE u.user_sub=?
+      ORDER BY u.occurred_at DESC, u.id DESC
+      LIMIT 12
+    `).all(userSub) as Record<string, unknown>[];
+
+    const monthCalls = Number(month.calls);
+    const monthSuccesses = Number(month.successes);
+    const dailyMap = new Map(
+      dailyRows.map((row) => [
+        String(row.day),
+        {
+          calls: Number(row.calls),
+          failures: Number(row.failures)
+        }
+      ])
+    );
+
+    const daily = Array.from({ length: 30 }, (_, index) => {
+      const timestamp = dailyStart + index * 24 * 60 * 60_000;
+      const date = new Date(timestamp).toISOString().slice(0, 10);
+      const row = dailyMap.get(date);
+      return {
+        date,
+        calls: row?.calls ?? 0,
+        failures: row?.failures ?? 0
+      };
+    });
+
+    return {
+      period: {
+        timezone: "UTC",
+        monthStart: new Date(monthStart).toISOString(),
+        generatedAt: new Date(now).toISOString()
+      },
+      trackingSince:
+        totals.tracking_since === null || totals.tracking_since === undefined
+          ? null
+          : new Date(Number(totals.tracking_since)).toISOString(),
+      thisMonth: {
+        calls: monthCalls,
+        successes: monthSuccesses,
+        failures: Math.max(0, monthCalls - monthSuccesses),
+        successRate: monthCalls === 0 ? 100 : monthSuccesses / monthCalls,
+        avgDurationMs: Math.round(Number(month.avg_duration_ms))
+      },
+      todayCalls: Number(today.calls),
+      totalCalls: Number(totals.calls),
+      activeDays: Number(totals.active_days),
+      topTools: topTools.map((row) => {
+        const calls = Number(row.calls);
+        const successes = Number(row.successes);
+        return {
+          name: String(row.tool_name),
+          calls,
+          successRate: calls === 0 ? 100 : successes / calls,
+          avgDurationMs: Math.round(Number(row.avg_duration_ms))
+        };
+      }),
+      daily,
+      recent: recent.map((row) => ({
+        at: new Date(Number(row.occurred_at)).toISOString(),
+        toolName: String(row.tool_name),
+        deviceId: row.device_id === null ? null : String(row.device_id),
+        deviceName: row.device_name === null ? null : String(row.device_name),
+        durationMs: Number(row.duration_ms),
+        success: Number(row.success) === 1
+      }))
+    };
   }
 }
 

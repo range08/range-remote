@@ -36,3 +36,42 @@ describe("OpenAI tool compatibility", () => {
     expect(result.tools[0]?.outputSchema?.additionalProperties).toBe(false);
   });
 });
+
+describe("tool call observation", () => {
+  it("records only safe call metadata and marks MCP error results as failures", async () => {
+    let registeredHandler: ((args: unknown) => Promise<unknown>) | undefined;
+    const observations: Array<Record<string, unknown>> = [];
+    const fakeServer = {
+      registerTool: (_name: string, _config: unknown, handler: (args: unknown) => Promise<unknown>) => {
+        registeredHandler = handler;
+      },
+      server: { setRequestHandler: () => undefined }
+    };
+    const registry = createOpenAiToolRegistry(
+      fakeServer as any,
+      [{ type: "oauth2", scopes: ["remote:use"] }],
+      (observation) => observations.push(observation)
+    );
+    registry.register("read_file", {
+      title: "Read",
+      description: "Read"
+    }, async () => ({ content: [], isError: true }));
+
+    expect(registeredHandler).toBeDefined();
+    await registeredHandler!({
+      device: "device-1",
+      path: "/workspace/example.txt",
+      marker: "payload-value"
+    });
+
+    expect(observations).toHaveLength(1);
+    expect(observations[0]).toMatchObject({
+      name: "read_file",
+      deviceId: "device-1",
+      success: false
+    });
+    expect(typeof observations[0]?.durationMs).toBe("number");
+    expect(JSON.stringify(observations[0])).not.toContain("/workspace/example.txt");
+    expect(JSON.stringify(observations[0])).not.toContain("payload-value");
+  });
+});

@@ -22,10 +22,11 @@ trap cleanup EXIT INT TERM
 COOKIE_KEYS="$(
   node -e 'const c=require("node:crypto"); process.stdout.write(c.randomBytes(32).toString("base64url")+","+c.randomBytes(32).toString("base64url"))'
 )"
+INTERNAL_TOKEN="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
 
 cd "$ROOT"
 
-env   PORT="$AUTH_PORT"   AUTH_ISSUER="$AUTH_ISSUER"   MCP_RESOURCE="$MCP_RESOURCE"   AUTH_DATABASE_PATH="$TMP_DIR/auth.sqlite"   AUTH_JWKS_PATH="$TMP_DIR/jwks.json"   AUTH_COOKIE_KEYS="$COOKIE_KEYS"   AUTH_ALLOW_REGISTRATION=true   node apps/auth/dist/index.js >"$TMP_DIR/auth.log" 2>&1 &
+env   PORT="$AUTH_PORT"   AUTH_ISSUER="$AUTH_ISSUER"   MCP_RESOURCE="$MCP_RESOURCE"   AUTH_DATABASE_PATH="$TMP_DIR/auth.sqlite"   AUTH_JWKS_PATH="$TMP_DIR/jwks.json"   AUTH_COOKIE_KEYS="$COOKIE_KEYS"   AUTH_ALLOW_REGISTRATION=true   MCP_INTERNAL_URL="http://127.0.0.1:$MCP_PORT"   INTERNAL_API_TOKEN="$INTERNAL_TOKEN"   node apps/auth/dist/index.js >"$TMP_DIR/auth.log" 2>&1 &
 AUTH_PID=$!
 
 AUTH_READY=false
@@ -42,7 +43,7 @@ if [[ "$AUTH_READY" != true ]] || ! kill -0 "$AUTH_PID" 2>/dev/null; then
   exit 1
 fi
 
-env   PORT="$MCP_PORT"   PUBLIC_BASE_URL="$MCP_RESOURCE"   DATABASE_PATH="$TMP_DIR/relay.sqlite"   AUTH_ISSUER="$AUTH_ISSUER"   AUTH_AUDIENCE="$MCP_RESOURCE"   AUTH_JWKS_URL="http://127.0.0.1:$AUTH_PORT/jwks"   AUTH_REQUIRED_SCOPE=remote:use   node apps/server/dist/index.js >"$TMP_DIR/server.log" 2>&1 &
+env   PORT="$MCP_PORT"   PUBLIC_BASE_URL="$MCP_RESOURCE"   DATABASE_PATH="$TMP_DIR/relay.sqlite"   AUTH_ISSUER="$AUTH_ISSUER"   AUTH_AUDIENCE="$MCP_RESOURCE"   AUTH_JWKS_URL="http://127.0.0.1:$AUTH_PORT/jwks"   AUTH_REQUIRED_SCOPE=remote:use   INTERNAL_API_TOKEN="$INTERNAL_TOKEN"   node apps/server/dist/index.js >"$TMP_DIR/server.log" 2>&1 &
 MCP_PID=$!
 
 MCP_READY=false
