@@ -30,6 +30,11 @@ const providerConfig: Configuration = {
     long: { secure: true, httpOnly: true, sameSite: "lax" },
     short: { secure: true, httpOnly: true, sameSite: "lax" }
   },
+  clientDefaults: {
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none"
+  },
   features: {
     devInteractions: { enabled: false },
     registration: { enabled: true, initialAccessToken: false },
@@ -56,6 +61,7 @@ const providerConfig: Configuration = {
       }
     }
   },
+  issueRefreshToken: (_ctx, client) => client.grantTypeAllowed("refresh_token"),
   interactions: {
     url(_ctx, interaction) {
       return `/interaction/${interaction.uid}`;

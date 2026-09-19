@@ -62,6 +62,7 @@ assert discovery["response_types_supported"] == ["code"], discovery
 assert "implicit" not in discovery.get("grant_types_supported", []), discovery
 assert "authorization_code" in discovery.get("grant_types_supported", []), discovery
 assert "refresh_token" in discovery.get("grant_types_supported", []), discovery
+assert "offline_access" in discovery.get("scopes_supported", []), discovery
 
 username = "smoke-" + secrets.token_hex(4)
 email = username + "@example.com"
@@ -82,7 +83,6 @@ assert status in (302, 303), (status, body[:300])
 dcr = json.dumps({
     "redirect_uris": [CALLBACK],
     "token_endpoint_auth_method": "none",
-    "grant_types": ["authorization_code", "refresh_token"],
     "response_types": ["code"],
     "client_name": "Range Remote E2E",
 })
@@ -95,6 +95,7 @@ status, _, body = request(
 assert status == 201, (status, body[:500])
 client = json.loads(body)
 client_id = client["client_id"]
+assert "refresh_token" in client.get("grant_types", []), client
 
 verifier = secrets.token_urlsafe(48)
 challenge = base64.urlsafe_b64encode(
@@ -105,7 +106,7 @@ base_auth = {
     "client_id": client_id,
     "redirect_uri": CALLBACK,
     "response_type": "code",
-    "scope": "openid email offline_access remote:use",
+    "scope": "openid email remote:use",
     "prompt": "consent",
     "state": "negative-state",
 }
@@ -136,7 +137,7 @@ query = urllib.parse.urlencode({
     "client_id": client_id,
     "redirect_uri": CALLBACK,
     "response_type": "code",
-    "scope": "openid email offline_access remote:use",
+    "scope": "openid email remote:use",
     "prompt": "consent",
     "state": "e2e-state",
     "resource": MCP_RESOURCE,
@@ -369,7 +370,7 @@ assert isinstance(profile_structured.get("id"), str) and profile_structured["id"
 print(json.dumps({
     "dcr": True,
     "pkce": True,
-    "refresh_token": True,
+    "refresh_token_without_offline_access": True,
     "resource_audience": claims["aud"],
     "scope": scope,
     "id_token": {
