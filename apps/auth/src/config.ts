@@ -8,7 +8,7 @@ const EnvSchema = z.object({
   AUTH_DATABASE_PATH: z.string().default("./data/auth.sqlite"),
   AUTH_JWKS_PATH: z.string().default("./data/jwks.json"),
   AUTH_COOKIE_KEYS: z.string().min(32),
-  AUTH_ALLOW_REGISTRATION: z.enum(["true", "false"]).default("true")
+  AUTH_ALLOW_REGISTRATION: z.enum(["true", "false"]).default("false")
 });
 
 const env = EnvSchema.parse(process.env);
