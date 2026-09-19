@@ -33,14 +33,6 @@ app.get("/privacy", (_req, res) => {
 });
 
 
-app.get("/.well-known/openai-apps-challenge", (_req, res) => {
-  if (!config.OPENAI_APPS_CHALLENGE) {
-    res.sendStatus(404);
-    return;
-  }
-  res.type("text/plain").send(config.OPENAI_APPS_CHALLENGE);
-});
-
 app.get("/.well-known/oauth-protected-resource", (_req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.json({

@@ -184,7 +184,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   tools.register("git_diff", {
     title: "Read Git diff",
-    description: "Returns an unstaged or staged Git diff from an allowed working directory.",
+    description: "Returns an unstaged or staged Git diff. Restricted agents require local sensitive-file opt-in and scope the diff to the requested working subtree; unrestricted agents allow the full repository diff visible to the local OS user.",
     inputSchema: z.object({
       device: z.string().uuid(),
       cwd: z.string().min(1),

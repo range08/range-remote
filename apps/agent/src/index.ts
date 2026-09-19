@@ -12,11 +12,14 @@ if (command === "pair") {
   await pair(parseArgs(args));
 } else if (command === "start") {
   await start();
+} else if (command === "status") {
+  status();
 } else {
   console.error("Usage:");
   console.error("  range-remote-agent pair --server URL --code CODE --name NAME --unrestricted");
   console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell] [--allow-sensitive-files]");
   console.error("  range-remote-agent start");
+  console.error("  range-remote-agent status");
   process.exit(2);
 }
 
@@ -70,6 +73,20 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
       ? `Paired ${name} in unrestricted mode. Config saved to ${configPath}`
       : `Paired ${name}. Config saved to ${configPath}`
   );
+}
+
+function status(): void {
+  const config = loadConfig();
+  console.log(JSON.stringify({
+    configPath,
+    name: config.name,
+    server: config.server,
+    unrestricted: config.unrestricted,
+    allowedRoots: config.allowedRoots,
+    allowShell: config.allowShell,
+    allowSensitiveFiles: config.allowSensitiveFiles,
+    paired: Boolean(config.deviceId && config.deviceToken)
+  }, null, 2));
 }
 
 async function start(): Promise<void> {

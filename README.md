@@ -42,7 +42,7 @@ npm run dev:agent -- pair \
 ## Security defaults
 
 - Restricted mode confines filesystem tools to explicitly configured roots; unrestricted mode intentionally removes this application-level boundary.
-- Restricted mode denies common sensitive credential paths by default; unrestricted mode intentionally permits them subject to OS permissions.
+- Restricted mode denies common sensitive credential paths by default. Because tracked diffs can expose file contents, `git_diff` also requires local sensitive-file opt-in in restricted mode. Unrestricted mode intentionally permits these operations subject to OS permissions.
 - Restricted mode disables shell execution unless enabled locally. Unrestricted mode enables shell automatically and passes through the agent process environment. In either mode, shell commands run with the operating-system permissions of the agent process.
 - File reads/writes and command output have size limits.
 - Restricted path checks resolve symlinks before enforcing allowed roots.
@@ -56,8 +56,7 @@ npm run dev:agent -- pair \
 - `apps/auth`: OAuth 2.1 / OpenID Connect authorization server with DCR, PKCE S256, RFC 8707 resource indicators, SQLite persistence, and persistent signing keys.
 - `apps/agent`: local/remote device agent.
 - `packages/shared`: RPC schemas shared by relay and agent.
-- `docs/SUBMISSION.md`: OpenAI plugin submission checklist.
-- `PRIVACY.md`: privacy policy draft for publication.
+- `PRIVACY.md`: privacy and data-handling notes.
 
 ## Local development
 
@@ -105,6 +104,12 @@ Then keep the agent connected:
 npm run dev:agent -- start
 ```
 
+Inspect the saved local mode without printing the device token:
+
+```bash
+node apps/agent/dist/index.js status
+```
+
 ## Production
 
 The production MCP endpoint is `https://remotemcp.range08.shop/mcp`. Range Remote uses its own dedicated `range-remote-gateway` on the `remotemcp.range08.shop` origin; it is not routed through or combined with the personal `range08.shop` homepage. Cloudflare Tunnel reaches only the gateway. The authorization server and MCP relay live on a separate internal-only Docker network and have no published host ports or direct Internet egress.
@@ -113,7 +118,6 @@ Production containers run as non-root with read-only root filesystems, dropped L
 
 The authorization server advertises authorization-code flow only, requires PKCE S256, supports refresh tokens, and binds access tokens to the dedicated Range Remote origin.
 
-See `docs/SUBMISSION.md`.
 
 ## Support
 
