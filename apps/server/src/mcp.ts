@@ -67,6 +67,42 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
     return text({ devices });
   });
 
+  tools.register("remove_device", {
+    title: "Remove paired device",
+    description: "Permanently removes one paired device from the authenticated account and disconnects it immediately.",
+    inputSchema: z.object({
+      device: z.string().uuid().describe("Device id from list_devices")
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+      idempotentHint: true
+    },
+    _meta: meta("Removing device…", "Device removed")
+  }, async ({ device }) => {
+    const removed = store.deleteDeviceForUser(userSub, device);
+    if (removed) hub.disconnect(device);
+    return text({ removed });
+  });
+
+  tools.register("remove_all_devices", {
+    title: "Remove all paired devices",
+    description: "Permanently removes every paired device and outstanding pairing code for the authenticated account.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+      idempotentHint: true
+    },
+    _meta: meta("Removing devices…", "Devices removed")
+  }, async () => {
+    const devices = store.listDevices(userSub);
+    const removed = store.removeAllForUser(userSub);
+    for (const device of devices) hub.disconnect(device.id);
+    return text({ removed });
+  });
+
   tools.register("create_pairing_code", {
     title: "Create device pairing code",
     description: "Creates a single-use pairing code that expires in 10 minutes. The user must enter the code locally on a device.",
@@ -165,7 +201,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   tools.register("run_command", {
     title: "Run device shell command",
-    description: "Runs one shell command in an allowed working directory only when shell access was explicitly enabled in the local agent. Commands can modify data or access the network.",
+    description: "Runs one shell command only when shell access was explicitly enabled on the local agent. The working directory must be within an allowed root, but the command itself runs with the operating-system permissions of the agent process and can modify data or access the network.",
     inputSchema: z.object({
       device: z.string().uuid(),
       cwd: z.string().min(1),

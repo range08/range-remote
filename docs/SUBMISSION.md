@@ -1,46 +1,51 @@
 # OpenAI Plugin Submission Checklist
 
-This file tracks work needed before submitting Range Remote as a public MCP-backed plugin.
+Range Remote is intended for submission as a public remote-MCP plugin.
 
 ## Required before review
 
 - [ ] Stable public HTTPS MCP endpoint ending in `/mcp`.
-- [ ] OAuth 2.1 provider configured for production.
-- [ ] Protected resource metadata at `/.well-known/oauth-protected-resource`.
-- [ ] Production OAuth issuer metadata supports PKCE S256 and an OpenAI-supported client registration method.
-- [ ] OAuth audience/resource is bound to the MCP server.
-- [ ] Every MCP request validates signature, issuer, audience, expiration, and required scopes.
-- [ ] Public privacy policy URL.
-- [ ] Public support contact.
-- [ ] Domain ownership challenge endpoint can be configured at `/.well-known/openai-apps-challenge`.
-- [ ] Demo reviewer account with no MFA requirement.
-- [ ] Demo device stays online throughout review.
-- [ ] Test prompts and exact expected outcomes prepared.
-- [ ] Tool annotations reviewed against actual behavior.
-- [ ] No secrets, internal trace IDs, OAuth tokens, or unnecessary PII in tool outputs.
-- [ ] Publisher identity verified in the OpenAI Platform organization.
-- [ ] `api.apps.write` permission available to submit.
+- [ ] OAuth 2.1 authorization server configured for production with PKCE S256 and a supported ChatGPT client registration mode.
+- [x] Protected resource metadata at `/.well-known/oauth-protected-resource`.
+- [x] OAuth tokens are checked for signature, issuer, audience, expiry, and required scopes.
+- [x] Domain challenge route exists at `/.well-known/openai-apps-challenge`.
+- [x] Public privacy, terms, security, and support documents exist in the repository.
+- [x] Device removal and all-device deletion are implemented.
+- [ ] Publisher identity is verified in the OpenAI Platform organization.
+- [ ] App management write permission is available.
+- [ ] Reviewer account works without MFA, email verification, SMS verification, or private-network access.
+- [ ] Dedicated review device remains online during review.
+- [ ] Domain ownership challenge token is installed during submission.
+- [ ] Listing logo and final public website/support URLs are supplied.
 
-## Proposed review tests
+## Positive review tests
 
-1. List the connected devices.
-2. Read `README.md` from the demo workspace.
-3. List files in the demo workspace.
-4. Run `git status --short` using the dedicated read-only Git tool.
-5. Create a new text file in the demo workspace.
-6. Attempt to read `.env` and verify that the agent refuses.
-7. Attempt a path traversal outside the allowed root and verify refusal.
-8. Invoke shell on a device configured with shell disabled and verify refusal.
-9. On the dedicated review device, run a harmless shell command such as `pwd`.
+1. List paired devices and confirm the dedicated review device is online.
+2. List the files in the review workspace.
+3. Read `README.md` from the review workspace.
+4. Run the dedicated read-only `git_status` tool in the review repository.
+5. Create a harmless new text file in the review workspace with `write_file`.
+
+## Negative review tests
+
+1. Attempt to read `.env`; the local agent must refuse the sensitive credential path.
+2. Attempt to read a path outside the configured root; the local agent must refuse it.
+3. Invoke `run_command` on a device where shell access is disabled; the local agent must refuse it.
 
 ## Tool annotation rationale
 
-- `profile`: read-only, non-destructive, closed-world.
-- `list_devices`: read-only, non-destructive, closed-world.
-- `create_pairing_code`: state-changing but non-destructive, closed-world.
-- `list_directory`: read-only, non-destructive, closed-world.
-- `read_file`: read-only, non-destructive, closed-world.
-- `git_status`: read-only, non-destructive, closed-world.
-- `git_diff`: read-only, non-destructive, closed-world.
+- `profile`, `list_devices`, `system_info`, `list_directory`, `read_file`, `git_status`, `git_diff`: read-only, non-destructive, closed-world.
+- `create_pairing_code`: state-changing, non-destructive, closed-world.
+- `remove_device`, `remove_all_devices`: destructive account/device state changes, closed-world.
 - `write_file`: state-changing and potentially destructive when overwriting, closed-world.
-- `run_command`: state-changing, potentially destructive, and open-world because a command can access network destinations when the local policy permits it.
+- `run_command`: state-changing, potentially destructive, open-world, and available only after local shell opt-in.
+
+## Listing draft
+
+- Name: Range Remote
+- Short description: Securely connect ChatGPT to computers you explicitly pair for file, Git, and optional shell workflows.
+- Category: Developer tools
+- Website: https://github.com/range08/range-remote
+- Support: https://github.com/range08/range-remote/issues
+- Privacy: https://github.com/range08/range-remote/blob/main/PRIVACY.md
+- Terms: https://github.com/range08/range-remote/blob/main/TERMS.md

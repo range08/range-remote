@@ -9,12 +9,16 @@ const EnvSchema = z.object({
   AUTH_AUDIENCE: z.string().url(),
   AUTH_JWKS_URL: z.string().url(),
   AUTH_REQUIRED_SCOPE: z.string().min(1).default("remote:use"),
-  AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000)
+  AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  OPENAI_APPS_CHALLENGE: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1).optional()
+  )
 });
 
 export const config = EnvSchema.parse(process.env);
 
-export const mcpResource = new URL("/", config.PUBLIC_BASE_URL).toString();
+export const mcpResource = new URL(config.PUBLIC_BASE_URL).origin;
 export const protectedResourceMetadataUrl = new URL(
   "/.well-known/oauth-protected-resource",
   config.PUBLIC_BASE_URL

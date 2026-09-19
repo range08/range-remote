@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { WebSocket } from "ws";
 import { RpcRequestSchema, type AgentConfig } from "@range-remote/shared";
@@ -19,10 +20,20 @@ if (command === "pair") {
 }
 
 async function pair(flags: Map<string, string[]>): Promise<void> {
-  const server = required(flags, "server").replace(/\/+$/, "");
+  const serverUrl = new URL(required(flags, "server"));
+  const localHosts = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+  if (serverUrl.protocol !== "https:" && !(serverUrl.protocol === "http:" && localHosts.has(serverUrl.hostname))) {
+    throw new Error("Remote agent servers must use HTTPS; HTTP is allowed only for localhost development");
+  }
+  const server = serverUrl.toString().replace(/\/+$/, "");
   const code = required(flags, "code");
   const name = required(flags, "name");
-  const roots = (flags.get("root") ?? []).map((root) => resolve(root));
+  const roots = (flags.get("root") ?? []).map((root) => {
+    const absolute = resolve(root);
+    const stat = statSync(absolute);
+    if (!stat.isDirectory()) throw new Error(`Allowed root is not a directory: ${absolute}`);
+    return realpathSync(absolute);
+  });
   if (roots.length === 0) throw new Error("At least one --root is required");
 
   const response = await fetch(`${server}/agent/pair`, {
@@ -76,7 +87,13 @@ async function connectOnce(config: AgentConfig, wsUrl: URL): Promise<void> {
     ws.on("open", () => console.error(`Connected as ${config.name}`));
 
     ws.on("message", async (raw) => {
-      const parsed = RpcRequestSchema.safeParse(JSON.parse(raw.toString()));
+      let parsed;
+      try {
+        parsed = RpcRequestSchema.safeParse(JSON.parse(raw.toString()));
+      } catch {
+        ws.close(1003, "Invalid request");
+        return;
+      }
       if (!parsed.success) {
         ws.close(1003, "Invalid request");
         return;

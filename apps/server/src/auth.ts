@@ -39,7 +39,7 @@ export const tokenVerifier: OAuthTokenVerifier = {
     } catch (error) {
       throw new OAuthError(
         OAuthErrorCode.InvalidToken,
-        error instanceof Error ? error.message : "Invalid access token"
+        "Invalid access token"
       );
     }
   }

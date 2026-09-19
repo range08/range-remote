@@ -24,7 +24,7 @@ Files, repositories, processes, and commands remain on the paired device unless 
 
 ## Retention
 
-Pairing codes expire automatically. Device metadata remains until the device is removed. Operational logs should avoid tool payloads and secrets and should be retained only as needed for security and reliability.
+Pairing codes expire automatically. Device metadata remains until the user removes a device. The `remove_device` tool removes one device, and `remove_all_devices` removes all paired devices and outstanding pairing codes for the authenticated account. Operational logs avoid tool payloads and secrets and should be retained only as needed for security and reliability.
 
 ## Sharing
 
@@ -32,8 +32,8 @@ Range Remote does not sell user data. Data is sent only to infrastructure requir
 
 ## User control
 
-Users can stop the agent at any time to disconnect a device. Device removal and account deletion endpoints are planned before public launch.
+Users can stop the agent at any time to disconnect a device. Users can also remove one device or remove all device metadata and outstanding pairing codes through authenticated MCP tools.
 
 ## Contact
 
-Before public submission, replace this section with a monitored support contact for the publisher.
+For privacy or support requests, use the repository issue tracker. Do not post secrets or security vulnerabilities in public issues; use GitHub Security Advisories for security reports.

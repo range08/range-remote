@@ -15,14 +15,17 @@ type Pending = {
 export class AgentHub {
   private readonly sockets = new Map<string, WebSocket>();
   private readonly pending = new Map<string, Pending>();
-  private readonly wss = new WebSocketServer({ noServer: true });
+  private readonly wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 
   constructor(private readonly store: Store) {}
 
   attach(server: HttpServer): void {
     server.on("upgrade", (request, socket, head) => {
       const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-      if (url.pathname !== "/agent/ws") return;
+      if (url.pathname !== "/agent/ws") {
+        socket.destroy();
+        return;
+      }
       this.wss.handleUpgrade(request, socket, head, (ws) => this.accept(ws, request));
     });
   }
@@ -31,11 +34,11 @@ export class AgentHub {
     return this.sockets.get(deviceId)?.readyState === WebSocket.OPEN;
   }
 
-  disconnect(deviceId: string): void {
+  disconnect(deviceId: string, reason = "Device removed"): void {
     const ws = this.sockets.get(deviceId);
     this.sockets.delete(deviceId);
-    if (ws && ws.readyState === WebSocket.OPEN) ws.close(1000, "Device removed");
-    this.rejectPendingForDevice(deviceId, new Error("Device was removed"));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.close(1000, reason);
+    this.rejectPendingForDevice(deviceId, new Error(reason));
   }
 
   async call(

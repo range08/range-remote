@@ -116,6 +116,12 @@ export class Store {
     return Number(result.changes) === 1;
   }
 
+  removeAllForUser(userSub: string): number {
+    this.db.prepare("DELETE FROM pairing_codes WHERE user_sub=?").run(userSub);
+    const result = this.db.prepare("DELETE FROM devices WHERE user_sub=?").run(userSub);
+    return Number(result.changes);
+  }
+
   touchDevice(id: string): void {
     this.db.prepare("UPDATE devices SET last_seen=? WHERE id=?").run(new Date().toISOString(), id);
   }

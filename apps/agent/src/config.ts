@@ -1,14 +1,14 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { AgentConfig } from "@range-remote/shared";
+import { AgentConfigSchema, type AgentConfig } from "@range-remote/shared";
 
 export const configPath =
   process.env.RANGE_REMOTE_CONFIG ??
   join(homedir(), ".config", "range-remote", "config.json");
 
 export function loadConfig(): AgentConfig {
-  return JSON.parse(readFileSync(configPath, "utf8")) as AgentConfig;
+  return AgentConfigSchema.parse(JSON.parse(readFileSync(configPath, "utf8")));
 }
 
 export function saveConfig(config: AgentConfig): void {

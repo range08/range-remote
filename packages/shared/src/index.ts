@@ -32,16 +32,18 @@ export const PairRequestSchema = z.object({
 
 export type PairRequest = z.infer<typeof PairRequestSchema>;
 
-export type AgentConfig = {
-  server: string;
-  deviceId: string;
-  deviceToken: string;
-  name: string;
-  allowedRoots: string[];
-  allowShell: boolean;
-  allowSensitiveFiles: boolean;
-  maxReadBytes: number;
-  maxWriteBytes: number;
-  maxCommandOutputBytes: number;
-  maxCommandSeconds: number;
-};
+export const AgentConfigSchema = z.object({
+  server: z.string().url(),
+  deviceId: z.string().uuid(),
+  deviceToken: z.string().min(32),
+  name: z.string().min(1).max(80),
+  allowedRoots: z.array(z.string().min(1)).min(1),
+  allowShell: z.boolean(),
+  allowSensitiveFiles: z.boolean(),
+  maxReadBytes: z.number().int().positive().max(16 * 1024 * 1024),
+  maxWriteBytes: z.number().int().positive().max(16 * 1024 * 1024),
+  maxCommandOutputBytes: z.number().int().positive().max(16 * 1024 * 1024),
+  maxCommandSeconds: z.number().int().positive().max(600)
+});
+
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;

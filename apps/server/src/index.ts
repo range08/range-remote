@@ -7,17 +7,20 @@ import { AgentHub } from "./agent-hub.js";
 import { tokenVerifier } from "./auth.js";
 import { config, mcpResource, protectedResourceMetadataUrl } from "./config.js";
 import { buildMcpServer } from "./mcp.js";
+import { fixedWindowRateLimit } from "./rate-limit.js";
 import { Store } from "./store.js";
 
 const store = new Store();
 const hub = new AgentHub(store);
 const publicUrl = new URL(config.PUBLIC_BASE_URL);
+const pairRateLimit = fixedWindowRateLimit(20, 60_000);
 
 const app = createMcpExpressApp({
   host: "0.0.0.0",
   allowedHosts: [publicUrl.hostname, "localhost", "127.0.0.1"],
   jsonLimit: "1mb"
 });
+app.disable("x-powered-by");
 
 app.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "range-remote", version: "0.1.0" });
@@ -29,16 +32,29 @@ app.get("/privacy", (_req, res) => {
   );
 });
 
+
+app.get("/.well-known/openai-apps-challenge", (_req, res) => {
+  if (!config.OPENAI_APPS_CHALLENGE) {
+    res.sendStatus(404);
+    return;
+  }
+  res.type("text/plain").send(config.OPENAI_APPS_CHALLENGE);
+});
+
 app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.json({
     resource: mcpResource,
     authorization_servers: [config.AUTH_ISSUER],
     scopes_supported: [config.AUTH_REQUIRED_SCOPE],
-    bearer_methods_supported: ["header"]
+    bearer_methods_supported: ["header"],
+    resource_documentation: "https://github.com/range08/range-remote#readme",
+    resource_policy_uri: "https://github.com/range08/range-remote/blob/main/PRIVACY.md",
+    resource_tos_uri: "https://github.com/range08/range-remote/blob/main/TERMS.md"
   });
 });
 
-app.post("/agent/pair", (req, res) => {
+app.post("/agent/pair", pairRateLimit, (req, res) => {
   const parsed = PairRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_request" });
@@ -52,13 +68,18 @@ app.post("/agent/pair", (req, res) => {
   }
 
   const device = store.createDevice(userSub, parsed.data.name);
+  res.setHeader("Cache-Control", "no-store");
   res.json({ deviceId: device.id, deviceToken: device.token });
 });
 
 const handler = createMcpHandler(
   ({ authInfo }) => {
     if (!authInfo) throw new Error("Authentication context missing");
-    return buildMcpServer(authInfo.clientId, store, hub);
+    const userSub = authInfo.extra?.userSub;
+    if (typeof userSub !== "string" || userSub.length === 0) {
+      throw new Error("Verified user identity missing");
+    }
+    return buildMcpServer(userSub, store, hub);
   },
   { responseMode: "json" }
 );
