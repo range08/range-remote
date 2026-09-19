@@ -30,8 +30,14 @@ const providerConfig: Configuration = {
     long: { secure: true, httpOnly: true, sameSite: "lax" },
     short: { secure: true, httpOnly: true, sameSite: "lax" }
   },
+  clientDefaults: {
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none"
+  },
   features: {
     devInteractions: { enabled: false },
+    alwaysIssueRefresh: { enabled: true },
     registration: { enabled: true, initialAccessToken: false },
     registrationManagement: { enabled: true },
     resourceIndicators: {
