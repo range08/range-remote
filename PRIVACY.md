@@ -6,34 +6,54 @@ Range Remote connects an authenticated ChatGPT user to computers that the user h
 
 ## Data processed
 
-The relay processes:
-- the identity subject supplied by the configured OAuth provider;
-- paired device identifiers, user-chosen device names, and connection status;
-- short-lived pairing codes;
-- MCP tool arguments and the corresponding device responses while a request is being executed.
+The authorization service stores:
+- a user-selected username and email address;
+- a randomly salted scrypt password hash; plaintext passwords are not stored;
+- OAuth/OpenID Connect client, session, grant, authorization, and token metadata needed to authenticate connections;
+- an RS256 signing key used to issue OAuth tokens.
 
-The relay does not need to store file contents or shell output after returning a tool response. The reference implementation does not persist those payloads.
+The relay stores:
+- the authenticated account subject identifier;
+- paired device identifiers, user-selected device names, and connection status;
+- short-lived pairing codes and hashed device bearer tokens.
 
-## Credentials
+While a tool runs, the relay processes the tool arguments and the corresponding device response. The reference implementation does not persist file contents, command output, or ordinary tool response payloads after returning the response to ChatGPT.
 
-Device bearer tokens are generated randomly and stored on the relay only as cryptographic hashes. OAuth access tokens are validated for each MCP request and are not written to the application database.
+## Credentials and tokens
 
-## Local data
+Device bearer tokens are generated randomly. The relay stores only their SHA-256 hashes.
 
-Files, repositories, processes, and commands remain on the paired device unless a user invokes a tool that returns data to ChatGPT. The local agent blocks sensitive credential locations by default and restricts operations to locally configured roots.
+OAuth bearer tokens presented to the MCP relay are verified on each request for signature, issuer, audience, expiration, and required scopes. The relay does not persist the presented bearer token in its application database. The authorization service stores the protocol artifacts required by the OAuth/OpenID Connect implementation and keeps its signing private key in its persistent data volume.
+
+## Local device data
+
+Files, repositories, processes, and commands remain on the paired device unless a user invokes a tool that returns data to ChatGPT. The local agent blocks common credential locations by default and restricts filesystem tools to explicitly configured roots. Optional shell execution must be enabled locally and runs with the operating-system permissions of the agent process.
 
 ## Retention
 
-Pairing codes expire automatically. Device metadata remains until the user removes a device. The `remove_device` tool removes one device, and `remove_all_devices` removes all paired devices and outstanding pairing codes for the authenticated account. Operational logs avoid tool payloads and secrets and should be retained only as needed for security and reliability.
+The reference implementation uses these maximum lifetimes for authorization artifacts:
+- authorization interactions: 15 minutes;
+- authorization codes: 10 minutes;
+- access and ID tokens: 1 hour;
+- sessions and refresh tokens: 7 days;
+- grants: 14 days.
+
+Pairing codes expire automatically after 10 minutes. Device metadata remains until the user removes the device. The `remove_device` tool removes one device, and `remove_all_devices` removes all paired devices and outstanding pairing codes for the authenticated account.
+
+Authentication account records and dynamically registered OAuth client records remain until they are removed as part of account or service administration. Operational logs should avoid tool payloads and secrets and should be retained only as needed for security and reliability.
 
 ## Sharing
 
-Range Remote does not sell user data. Data is sent only to infrastructure required to provide the service and to OpenAI when the user invokes the plugin through ChatGPT.
+Range Remote does not sell user data. Data is sent only to infrastructure required to operate the service and to OpenAI when the user invokes the plugin through ChatGPT.
 
 ## User control
 
-Users can stop the agent at any time to disconnect a device. Users can also remove one device or remove all device metadata and outstanding pairing codes through authenticated MCP tools.
+Users can stop the local agent at any time to disconnect a device. Users can remove one or all paired devices through authenticated MCP tools. Users seeking deletion of authentication-account data should use the support channel without posting passwords, tokens, private keys, or private file contents.
+
+## Email verification
+
+The reference implementation records email addresses but does not currently verify ownership of those addresses. It therefore does not claim support for ChatGPT workspace email-domain restrictions that require an `email_verified: true` UserInfo claim.
 
 ## Contact
 
-For privacy or support requests, use the repository issue tracker. Do not post secrets or security vulnerabilities in public issues; use GitHub Security Advisories for security reports.
+For non-sensitive support or privacy coordination, use the repository issue tracker without including private data. Report security vulnerabilities privately through GitHub Security Advisories.

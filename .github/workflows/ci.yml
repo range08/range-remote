@@ -23,5 +23,8 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - run: ./scripts/oauth-e2e-smoke.sh
       - run: npm audit --omit=dev --audit-level=high
+      - run: cp .env.example .env && docker compose config -q && rm .env
       - run: docker build -f apps/server/Dockerfile .
+      - run: docker build -f apps/auth/Dockerfile .

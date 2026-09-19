@@ -5,7 +5,10 @@ Range Remote is intended for submission as a public remote-MCP plugin.
 ## Required before review
 
 - [ ] Stable public HTTPS MCP endpoint ending in `/mcp`.
-- [ ] OAuth 2.1 authorization server configured for production with PKCE S256 and a supported ChatGPT client registration mode.
+- [ ] OAuth 2.1 authorization server deployed on the final public issuer hostname.
+- [x] Built-in authorization server implements OIDC discovery, DCR, authorization code + PKCE S256, RFC 9207 issuer identification, refresh tokens, persistent RS256 signing keys, and RFC 8707 resource indicators.
+- [x] Automated OAuth E2E covers DCR, PKCE-required rejection, invalid-resource rejection, login, consent, code exchange, resource-bound JWT issuance, MCP initialize, tools/list, tool security schemes, and annotations.
+- [x] OAuth discovery advertises `authorization_response_iss_parameter_supported: true`, public-client `none`, DCR, and S256.
 - [x] Protected resource metadata at `/.well-known/oauth-protected-resource`.
 - [x] OAuth tokens are checked for signature, issuer, audience, expiry, and required scopes.
 - [x] Domain challenge route exists at `/.well-known/openai-apps-challenge`.
@@ -14,6 +17,7 @@ Range Remote is intended for submission as a public remote-MCP plugin.
 - [ ] Publisher identity is verified in the OpenAI Platform organization.
 - [ ] App management write permission is available.
 - [ ] Reviewer account works without MFA, email verification, SMS verification, or private-network access.
+- [x] Workspace email-domain restriction is intentionally not claimed because the reference auth service does not yet assert `email_verified: true`.
 - [ ] Dedicated review device remains online during review.
 - [ ] Domain ownership challenge token is installed during submission.
 - [ ] Listing logo and final public website/support URLs are supplied.

@@ -6,10 +6,8 @@ COPY apps/server/package.json apps/server/package.json
 COPY apps/agent/package.json apps/agent/package.json
 COPY apps/auth/package.json apps/auth/package.json
 RUN npm ci
-COPY packages/shared packages/shared
-COPY apps/server apps/server
-RUN npm run build --workspace @range-remote/shared \
- && npm run build --workspace @range-remote/server \
+COPY apps/auth apps/auth
+RUN npm run build --workspace @range-remote/auth \
  && npm prune --omit=dev
 
 FROM node:24.21.0-slim
@@ -17,11 +15,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=build /app/packages/shared/dist ./packages/shared/dist
-COPY --from=build /app/apps/server/package.json ./apps/server/package.json
-COPY --from=build /app/apps/server/dist ./apps/server/dist
+COPY --from=build /app/apps/auth/package.json ./apps/auth/package.json
+COPY --from=build /app/apps/auth/dist ./apps/auth/dist
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node
-EXPOSE 8787
-CMD ["node", "apps/server/dist/index.js"]
+EXPOSE 8790
+CMD ["node", "apps/auth/dist/index.js"]

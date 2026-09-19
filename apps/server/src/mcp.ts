@@ -50,7 +50,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
     description: "Returns the authenticated Range Remote profile identifier without inspecting any device.",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: meta("Reading profile…", "Profile ready", { "openai/profile": true })
-  }, async () => text({ profile: userSub }));
+  }, async () => text({ id: userSub }));
 
   tools.register("list_devices", {
     title: "List paired devices",
