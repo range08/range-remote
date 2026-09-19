@@ -93,7 +93,7 @@ npm run dev:agent -- start
 
 ## Production
 
-The production MCP endpoint is `https://range08.shop/mcp`. The tested deployment uses the single public origin `https://range08.shop` behind a path-aware nginx reverse proxy: OAuth/OIDC routes are forwarded to `range-remote-auth`, while MCP and agent routes are forwarded to `range-remote`. `docker-compose.yml` runs both services as non-root containers with separate persistent volumes on the external `cloudflare` network. The authorization server advertises authorization-code flow only, requires PKCE S256, supports refresh tokens, and binds access tokens to the same public resource origin.
+The production MCP endpoint is `https://remotemcp.range08.shop/mcp`. Range Remote uses its own dedicated `range-remote-gateway` on the `remotemcp.range08.shop` origin; it is not routed through or combined with the personal `range08.shop` homepage. Cloudflare Tunnel sends only the `remotemcp.range08.shop` hostname to this gateway, which forwards OAuth/OIDC routes to `range-remote-auth` and MCP/agent routes to `range-remote`. `docker-compose.yml` runs the gateway, authorization server, and relay as non-root containers on the external `cloudflare` network. The authorization server advertises authorization-code flow only, requires PKCE S256, supports refresh tokens, and binds access tokens to the dedicated Range Remote origin.
 
 See `docs/SUBMISSION.md`.
 

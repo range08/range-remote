@@ -48,6 +48,26 @@ services:
       retries: 3
       start_period: 5s
 
+  gateway:
+    container_name: range-remote-gateway
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    networks:
+      - cloudflare
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--header=Host: remotemcp.range08.shop", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
 volumes:
   range_remote_data:
   range_remote_auth_data:
