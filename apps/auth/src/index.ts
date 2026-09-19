@@ -11,6 +11,7 @@ import { loadOrCreateJwks } from "./keys.js";
 import {
   consentPage,
   homePage,
+  interactionSubmitGuardScript,
   loginPage,
   registerPage
 } from "./html.js";
@@ -132,6 +133,11 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/", (_req, res) => {
   res.type("html").send(homePage(config.allowRegistration));
+});
+
+app.get("/auth/ui.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript").send(interactionSubmitGuardScript);
 });
 
 app.use("/reg", dcrRateLimit);
