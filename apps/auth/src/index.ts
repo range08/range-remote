@@ -37,7 +37,6 @@ const providerConfig: Configuration = {
   },
   features: {
     devInteractions: { enabled: false },
-    alwaysIssueRefresh: { enabled: true },
     registration: { enabled: true, initialAccessToken: false },
     registrationManagement: { enabled: true },
     resourceIndicators: {
@@ -62,6 +61,7 @@ const providerConfig: Configuration = {
       }
     }
   },
+  issueRefreshToken: (_ctx, client) => client.grantTypeAllowed("refresh_token"),
   interactions: {
     url(_ctx, interaction) {
       return `/interaction/${interaction.uid}`;
