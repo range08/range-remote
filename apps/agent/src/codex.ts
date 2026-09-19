@@ -361,7 +361,8 @@ async function connectMcpServer(
   cwdInput?: string
 ): Promise<{ client: Client; transport: Transport; listTimeoutMs: number; toolTimeoutMs: number }> {
   const raw = server.raw;
-  const startupTimeoutMs = timeoutMs(
+  const startupTimeoutMs = startupTimeout(
+    raw.startup_timeout_ms,
     raw.startup_timeout_sec,
     DEFAULT_MCP_STARTUP_TIMEOUT_MS
   );
@@ -374,6 +375,12 @@ async function connectMcpServer(
 
   let transport: Transport;
   if (typeof raw.command === "string") {
+    if (raw.experimental_environment === "remote") {
+      throw new Error(
+        'MCP server "' + server.name +
+        '" requests experimental_environment="remote", which Range Remote cannot execute because it has no Codex remote-executor context'
+      );
+    }
     if (typeof raw.url === "string") {
       throw new Error(
         'MCP server "' + server.name + '" cannot define both command and url'
@@ -445,9 +452,15 @@ function buildMcpEnvironment(
       if (typeof value === "string") env[key] = value;
     }
   }
-  for (const name of stringArray(raw.env_vars)) {
-    const value = process.env[name];
-    if (value !== undefined) env[name] = value;
+  for (const spec of envVarSpecs(raw.env_vars)) {
+    if (spec.source === "remote") {
+      throw new Error(
+        'MCP env var "' + spec.name +
+        '" requests source="remote", which Range Remote cannot resolve without a Codex remote-executor context'
+      );
+    }
+    const value = process.env[spec.name];
+    if (value !== undefined) env[spec.name] = value;
   }
   return env;
 }
@@ -480,9 +493,26 @@ function describeMcpServer(server: ResolvedMcpServer) {
   if (raw.http_headers_helper !== undefined) {
     warnings.push("http_headers_helper is not supported by Range Remote");
   }
-  if (raw.oauth !== undefined && !raw.bearer_token_env_var) {
+  const auth = stringValue(raw.auth);
+  if ((auth === "oauth" || auth === "chatgpt") && !raw.bearer_token_env_var) {
     warnings.push(
-      "Interactive OAuth is not implemented by the Range Remote bridge; a preconfigured token/header may be required"
+      auth === "chatgpt"
+        ? "ChatGPT-session MCP authentication is not available inside the paired-device bridge"
+        : "Interactive OAuth is not implemented by the Range Remote bridge; a preconfigured token/header may be required"
+    );
+  }
+  if (raw.experimental_environment === "remote") {
+    warnings.push(
+      'experimental_environment="remote" requires Codex remote execution and is not supported by Range Remote'
+    );
+  }
+  const remoteEnvVars = envVarSpecs(raw.env_vars)
+    .filter((spec) => spec.source === "remote")
+    .map((spec) => spec.name);
+  if (remoteEnvVars.length > 0) {
+    warnings.push(
+      'env_vars with source="remote" are not supported by Range Remote: ' +
+      remoteEnvVars.join(", ")
     );
   }
 
@@ -500,7 +530,7 @@ function describeMcpServer(server: ResolvedMcpServer) {
     ...(url ? { url: redactUrl(url) } : {}),
     ...(typeof raw.cwd === "string" ? { cwd: raw.cwd } : {}),
     envKeys: isRecord(raw.env) ? Object.keys(raw.env).sort() : [],
-    envVars: stringArray(raw.env_vars).sort(),
+    envVars: envVarSpecs(raw.env_vars).map((spec) => spec.name).sort(),
     headerNames: isRecord(raw.http_headers) ? Object.keys(raw.http_headers).sort() : [],
     envHeaderNames: isRecord(raw.env_http_headers)
       ? Object.keys(raw.env_http_headers).sort()
@@ -513,6 +543,9 @@ function describeMcpServer(server: ResolvedMcpServer) {
       : {}),
     ...(stringArray(raw.disabled_tools).length > 0
       ? { disabledTools: stringArray(raw.disabled_tools) }
+      : {}),
+    ...(typeof raw.startup_timeout_ms === "number"
+      ? { startupTimeoutMs: raw.startup_timeout_ms }
       : {}),
     ...(typeof raw.startup_timeout_sec === "number"
       ? { startupTimeoutSec: raw.startup_timeout_sec }
@@ -546,6 +579,40 @@ function filterTools(tools: Tool[], raw: Record<string, unknown>): Tool[] {
       (enabled.length === 0 || enabled.includes(tool.name)) &&
       !disabled.has(tool.name)
   );
+}
+
+function envVarSpecs(
+  value: unknown
+): Array<{ name: string; source: "local" | "remote" }> {
+  if (!Array.isArray(value)) return [];
+  const result: Array<{ name: string; source: "local" | "remote" }> = [];
+  for (const item of value) {
+    if (typeof item === "string" && item.length > 0) {
+      result.push({ name: item, source: "local" });
+      continue;
+    }
+    if (!isRecord(item) || typeof item.name !== "string" || item.name.length === 0) {
+      continue;
+    }
+    const source = item.source === "remote" ? "remote" : "local";
+    result.push({ name: item.name, source });
+  }
+  return result;
+}
+
+function startupTimeout(
+  milliseconds: unknown,
+  seconds: unknown,
+  fallback: number
+): number {
+  if (
+    typeof milliseconds === "number" &&
+    Number.isFinite(milliseconds) &&
+    milliseconds > 0
+  ) {
+    return Math.min(Math.max(Math.round(milliseconds), 1000), 120_000);
+  }
+  return timeoutMs(seconds, fallback);
 }
 
 function timeoutMs(value: unknown, fallback: number): number {

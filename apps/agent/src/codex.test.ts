@@ -12,10 +12,13 @@ import {
 } from "./codex.js";
 
 const originalCodexHome = process.env.CODEX_HOME;
+const originalFixtureFromHost = process.env.FIXTURE_FROM_HOST;
 
 afterEach(() => {
   if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = originalCodexHome;
+  if (originalFixtureFromHost === undefined) delete process.env.FIXTURE_FROM_HOST;
+  else process.env.FIXTURE_FROM_HOST = originalFixtureFromHost;
 });
 
 function baseConfig(root: string, allowMcp = false): AgentConfig {
@@ -145,6 +148,34 @@ describe("Codex-compatible MCP bridge", () => {
     expect(serialized).not.toContain("password");
   });
 
+  it("reports unsupported Codex remote-executor MCP settings without attempting to run them", async () => {
+    const root = mkdtempSync(join(tmpdir(), "rr-mcp-remote-"));
+    mkdirSync(join(root, ".git"));
+    const codexHome = join(root, ".codex");
+    mkdirSync(codexHome);
+    process.env.CODEX_HOME = codexHome;
+
+    writeFileSync(
+      join(codexHome, "config.toml"),
+      [
+        "[mcp_servers.remote]",
+        'command = "never-run"',
+        'experimental_environment = "remote"',
+        'env_vars = [{ name = "REMOTE_TOKEN", source = "remote" }]'
+      ].join("\n")
+    );
+
+    const config = baseConfig(root, true);
+    const listed = listMcpServers(config, root);
+    expect(listed.servers[0]?.envVars).toEqual(["REMOTE_TOKEN"]);
+    expect(listed.servers[0]?.compatibilityWarnings.join(" ")).toMatch(
+      /remote execution|source="remote"/
+    );
+    await expect(listMcpTools(config, "remote", root)).rejects.toThrow(
+      /remote-executor context/
+    );
+  });
+
   it("lists and calls an enabled STDIO MCP tool while redacting secret values", async () => {
     const root = mkdtempSync(join(tmpdir(), "rr-mcp-"));
     mkdirSync(join(root, ".git"));
@@ -164,12 +195,14 @@ describe("Codex-compatible MCP bridge", () => {
         'import { z } from ' + JSON.stringify(zodModule) + ';',
         'const server = new McpServer({ name: "fixture", version: "1.0.0" }, { instructions: "Fixture instructions" });',
         'server.registerTool("echo", { description: "Echo text", inputSchema: z.object({ text: z.string() }) }, async ({ text }) => ({ content: [{ type: "text", text }] }));',
+        'server.registerTool("read_env", { description: "Read host forwarded env" }, async () => ({ content: [{ type: "text", text: process.env.FIXTURE_FROM_HOST ?? "" }] }));',
         'server.registerTool("hidden", { description: "Hidden tool" }, async () => ({ content: [{ type: "text", text: "hidden" }] }));',
         'await server.connect(new StdioServerTransport());'
       ].join("\n")
     );
 
     const secret = "do-not-return-this-value";
+    process.env.FIXTURE_FROM_HOST = "forwarded-host-value";
     writeFileSync(
       join(codexHome, "config.toml"),
       [
@@ -177,8 +210,9 @@ describe("Codex-compatible MCP bridge", () => {
         "command = " + JSON.stringify(process.execPath),
         "args = [" + JSON.stringify(fixture) + "]",
         "cwd = " + JSON.stringify(root),
-        'enabled_tools = ["echo"]',
-        "startup_timeout_sec = 10",
+        'enabled_tools = ["echo", "read_env"]',
+        'env_vars = [{ name = "FIXTURE_FROM_HOST", source = "local" }]',
+        "startup_timeout_ms = 10000",
         "tool_timeout_sec = 10",
         "",
         "[mcp_servers.fixture.env]",
@@ -194,13 +228,18 @@ describe("Codex-compatible MCP bridge", () => {
       enabled: true,
       transport: "stdio",
       envKeys: ["FIXTURE_SECRET"],
-      enabledTools: ["echo"]
+      envVars: ["FIXTURE_FROM_HOST"],
+      enabledTools: ["echo", "read_env"],
+      startupTimeoutMs: 10000
     });
     expect(JSON.stringify(servers)).not.toContain(secret);
 
     const tools = await listMcpTools(config, "fixture", root);
     expect(tools.instructions).toBe("Fixture instructions");
-    expect(tools.tools.map((tool) => tool.name)).toEqual(["echo"]);
+    expect(tools.tools.map((tool) => tool.name)).toEqual(["echo", "read_env"]);
+
+    const envCalled = await callMcpTool(config, "fixture", "read_env", {}, root);
+    expect(JSON.stringify(envCalled.result)).toContain("forwarded-host-value");
 
     const called = await callMcpTool(
       config,
