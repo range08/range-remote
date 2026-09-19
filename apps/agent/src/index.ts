@@ -5,6 +5,7 @@ import { WebSocket } from "ws";
 import { RpcRequestSchema, type AgentConfig } from "@range-remote/shared";
 import { configPath, loadConfig, saveConfig } from "./config.js";
 import { execute } from "./operations.js";
+import { runWindowsServiceCommand } from "./windows-service.js";
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -14,12 +15,30 @@ if (command === "pair") {
   await start();
 } else if (command === "status") {
   status();
+} else if (command === "install-service") {
+  runWindowsServiceCommand("install", configPath);
+} else if (command === "uninstall-service") {
+  runWindowsServiceCommand("uninstall", configPath);
+} else if (command === "service-start") {
+  runWindowsServiceCommand("start", configPath);
+} else if (command === "service-stop") {
+  runWindowsServiceCommand("stop", configPath);
+} else if (command === "service-restart") {
+  runWindowsServiceCommand("restart", configPath);
+} else if (command === "service-status") {
+  runWindowsServiceCommand("status", configPath);
 } else {
   console.error("Usage:");
   console.error("  range-remote-agent pair --server URL --code CODE --name NAME --unrestricted");
   console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell] [--allow-sensitive-files] [--allow-mcp]");
   console.error("  range-remote-agent start");
   console.error("  range-remote-agent status");
+  console.error("  range-remote-agent install-service");
+  console.error("  range-remote-agent uninstall-service");
+  console.error("  range-remote-agent service-start");
+  console.error("  range-remote-agent service-stop");
+  console.error("  range-remote-agent service-restart");
+  console.error("  range-remote-agent service-status");
   process.exit(2);
 }
 
