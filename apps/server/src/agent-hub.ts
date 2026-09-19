@@ -12,12 +12,25 @@ type Pending = {
   timer: NodeJS.Timeout;
 };
 
-export class AgentHub {
-  private readonly sockets = new Map<string, WebSocket>();
-  private readonly pending = new Map<string, Pending>();
-  private readonly wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
+type ManagedWebSocket = WebSocket & { isAlive?: boolean };
 
-  constructor(private readonly store: Store) {}
+export class AgentHub {
+  private readonly sockets = new Map<string, ManagedWebSocket>();
+  private readonly pending = new Map<string, Pending>();
+  private readonly wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: config.AGENT_WS_MAX_PAYLOAD_BYTES,
+    perMessageDeflate: false
+  });
+  private readonly heartbeatTimer: NodeJS.Timeout;
+
+  constructor(private readonly store: Store) {
+    this.heartbeatTimer = setInterval(
+      () => this.heartbeat(),
+      config.AGENT_WS_HEARTBEAT_MS
+    );
+    this.heartbeatTimer.unref();
+  }
 
   attach(server: HttpServer): void {
     server.on("upgrade", (request, socket, head) => {
@@ -48,6 +61,15 @@ export class AgentHub {
   ): Promise<unknown> {
     const ws = this.sockets.get(deviceId);
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error("Device is offline");
+    if (this.pending.size >= config.MAX_PENDING_AGENT_REQUESTS) {
+      throw new Error("Relay is busy; try again shortly");
+    }
+    if (this.pendingForDevice(deviceId) >= config.MAX_PENDING_AGENT_REQUESTS_PER_DEVICE) {
+      throw new Error("Too many concurrent requests for this device");
+    }
+    if (ws.bufferedAmount > config.AGENT_WS_MAX_PAYLOAD_BYTES * 2) {
+      throw new Error("Device connection is backpressured");
+    }
 
     const id = randomUUID();
     const payload: RpcRequest = { id, kind, params };
@@ -78,7 +100,8 @@ export class AgentHub {
     });
   }
 
-  private accept(ws: WebSocket, request: IncomingMessage): void {
+  private accept(rawWs: WebSocket, request: IncomingMessage): void {
+    const ws = rawWs as ManagedWebSocket;
     const auth = request.headers.authorization;
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : "";
     const device = token ? this.store.findDeviceByToken(token) : null;
@@ -89,7 +112,16 @@ export class AgentHub {
     }
 
     const previous = this.sockets.get(device.id);
+    if (!previous && this.sockets.size >= config.MAX_AGENT_CONNECTIONS) {
+      ws.close(1013, "Relay connection limit reached");
+      return;
+    }
     if (previous && previous.readyState === WebSocket.OPEN) previous.close(1000, "Replaced");
+
+    ws.isAlive = true;
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
 
     this.sockets.set(device.id, ws);
     this.store.touchDevice(device.id);
@@ -98,7 +130,7 @@ export class AgentHub {
       try {
         const response = RpcResponseSchema.parse(JSON.parse(raw.toString()));
         const pending = this.pending.get(response.id);
-        if (!pending) return;
+        if (!pending || pending.deviceId !== device.id) return;
 
         clearTimeout(pending.timer);
         this.pending.delete(response.id);
@@ -108,19 +140,43 @@ export class AgentHub {
       }
     });
 
-    ws.on("close", () => {
-      if (this.sockets.get(device.id) === ws) {
-        this.sockets.delete(device.id);
-        this.rejectPendingForDevice(device.id, new Error("Device disconnected"));
-      }
-    });
+    ws.on("close", () => this.onSocketGone(device.id, ws, "Device disconnected"));
+    ws.on("error", () => this.onSocketGone(device.id, ws, "Device connection failed"));
+  }
 
-    ws.on("error", () => {
-      if (this.sockets.get(device.id) === ws) {
-        this.sockets.delete(device.id);
-        this.rejectPendingForDevice(device.id, new Error("Device connection failed"));
+  private heartbeat(): void {
+    for (const [deviceId, ws] of this.sockets) {
+      if (ws.readyState !== WebSocket.OPEN) {
+        this.onSocketGone(deviceId, ws, "Device connection closed");
+        continue;
       }
-    });
+      if (ws.isAlive === false) {
+        ws.terminate();
+        this.onSocketGone(deviceId, ws, "Device heartbeat timed out");
+        continue;
+      }
+      ws.isAlive = false;
+      try {
+        ws.ping();
+      } catch {
+        ws.terminate();
+        this.onSocketGone(deviceId, ws, "Device heartbeat failed");
+      }
+    }
+  }
+
+  private onSocketGone(deviceId: string, ws: ManagedWebSocket, reason: string): void {
+    if (this.sockets.get(deviceId) !== ws) return;
+    this.sockets.delete(deviceId);
+    this.rejectPendingForDevice(deviceId, new Error(reason));
+  }
+
+  private pendingForDevice(deviceId: string): number {
+    let count = 0;
+    for (const pending of this.pending.values()) {
+      if (pending.deviceId === deviceId) count += 1;
+    }
+    return count;
   }
 
   private rejectPendingForDevice(deviceId: string, error: Error): void {

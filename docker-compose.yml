@@ -4,17 +4,30 @@ services:
     build:
       context: .
       dockerfile: apps/auth/Dockerfile
-    env_file:
-      - .env
     environment:
       PORT: "8790"
+      AUTH_ISSUER: "${AUTH_ISSUER}"
+      MCP_RESOURCE: "${MCP_RESOURCE}"
+      AUTH_DATABASE_PATH: "${AUTH_DATABASE_PATH:-/app/data/auth.sqlite}"
+      AUTH_JWKS_PATH: "${AUTH_JWKS_PATH:-/app/data/jwks.json}"
+      AUTH_COOKIE_KEYS: "${AUTH_COOKIE_KEYS}"
+      AUTH_ALLOW_REGISTRATION: "${AUTH_ALLOW_REGISTRATION:-false}"
     volumes:
       - range_remote_auth_data:/app/data
-    ports:
-      - "127.0.0.1:8790:8790"
     networks:
-      - cloudflare
+      - internal
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8790/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -27,17 +40,40 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    env_file:
-      - .env
     environment:
       PORT: "8787"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL}"
+      DATABASE_PATH: "${DATABASE_PATH:-/app/data/range-remote.sqlite}"
+      AUTH_ISSUER: "${AUTH_ISSUER}"
+      AUTH_AUDIENCE: "${AUTH_AUDIENCE}"
+      AUTH_JWKS_URL: "http://range-remote-auth:8790/jwks"
+      AUTH_REQUIRED_SCOPE: "${AUTH_REQUIRED_SCOPE:-remote:use}"
+      AGENT_REQUEST_TIMEOUT_MS: "${AGENT_REQUEST_TIMEOUT_MS:-30000}"
+      OPENAI_APPS_CHALLENGE: "${OPENAI_APPS_CHALLENGE:-}"
+      MAX_PENDING_AGENT_REQUESTS: "${MAX_PENDING_AGENT_REQUESTS:-256}"
+      MAX_PENDING_AGENT_REQUESTS_PER_DEVICE: "${MAX_PENDING_AGENT_REQUESTS_PER_DEVICE:-8}"
+      MAX_AGENT_CONNECTIONS: "${MAX_AGENT_CONNECTIONS:-1000}"
+      AGENT_WS_MAX_PAYLOAD_BYTES: "${AGENT_WS_MAX_PAYLOAD_BYTES:-2097152}"
+      AGENT_WS_HEARTBEAT_MS: "${AGENT_WS_HEARTBEAT_MS:-30000}"
+      USER_DEVICE_REQUESTS_PER_MINUTE: "${USER_DEVICE_REQUESTS_PER_MINUTE:-300}"
+      USER_CONCURRENT_DEVICE_REQUESTS: "${USER_CONCURRENT_DEVICE_REQUESTS:-16}"
+      MAX_DEVICES_PER_USER: "${MAX_DEVICES_PER_USER:-100}"
     volumes:
       - range_remote_data:/app/data
-    ports:
-      - "127.0.0.1:8787:8787"
     networks:
-      - cloudflare
+      - internal
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     depends_on:
       auth:
         condition: service_healthy
@@ -55,7 +91,20 @@ services:
       dockerfile: apps/gateway/Dockerfile
     networks:
       - cloudflare
+      - internal
     restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 96m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+      - /var/cache/nginx:rw,nosuid,nodev,noexec,size=16m
     depends_on:
       auth:
         condition: service_healthy
@@ -75,3 +124,7 @@ volumes:
 networks:
   cloudflare:
     external: true
+  internal:
+    name: range-remote-internal
+    driver: bridge
+    internal: true

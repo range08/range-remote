@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Adapter, AdapterPayload } from "oidc-provider";
@@ -7,6 +7,7 @@ import { config } from "./config.js";
 mkdirSync(dirname(config.databasePath), { recursive: true });
 
 const db = new DatabaseSync(config.databasePath);
+chmodSync(config.databasePath, 0o600);
 db.exec(`
   PRAGMA journal_mode=WAL;
   PRAGMA foreign_keys=ON;

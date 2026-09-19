@@ -4,7 +4,7 @@ import {
   scryptSync,
   timingSafeEqual
 } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
@@ -12,6 +12,7 @@ import { config } from "./config.js";
 mkdirSync(dirname(config.databasePath), { recursive: true });
 
 const db = new DatabaseSync(config.databasePath);
+chmodSync(config.databasePath, 0o600);
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
