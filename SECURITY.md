@@ -4,12 +4,13 @@
 
 Range Remote intentionally exposes powerful capabilities. The relay therefore treats all MCP input, agent traffic, filesystem paths, and shell commands as untrusted.
 
-The primary device-side security boundary is the local agent policy. Filesystem tools cannot access paths outside configured roots. Optional shell execution is a separate capability: its working directory must be within an allowed root, but the shell itself inherits the operating-system permissions of the agent process.
+Device-side permissions are selected locally. Restricted mode provides application-level guardrails for filesystem roots, sensitive paths, and shell access. Unrestricted mode intentionally removes those guardrails and grants remote tools the permissions of the OS account running the agent. Neither mode weakens relay authentication, device ownership checks, or OCI isolation.
 
 ## Defaults
 
-- No shell access unless `allowShell` is enabled on the device. Filesystem roots do not sandbox an enabled shell; shell commands inherit the OS permissions of the agent process. Use a dedicated low-privilege account or OS/container sandbox when enabling shell execution.
-- Sensitive files and directories are blocked unless the user changes the agent config locally.
+- Restricted mode requires `allowShell` for shell access and blocks common sensitive paths by default.
+- `unrestricted` can only be enabled in local agent configuration or during local pairing. It bypasses allowed-root and sensitive-file checks, enables shell execution, and preserves the agent process environment for child commands.
+- In unrestricted mode, the effective security boundary is the operating-system account that runs the agent; UAC/sudo and filesystem ACLs still apply.
 - No remote operation can change the local agent policy.
 - Every device belongs to exactly one authenticated user subject.
 - Pairing codes are short-lived and single-use.

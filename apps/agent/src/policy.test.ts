@@ -11,6 +11,7 @@ function config(root: string): AgentConfig {
     deviceId: crypto.randomUUID(),
     deviceToken: "token",
     name: "test",
+    unrestricted: false,
     allowedRoots: [root],
     allowShell: false,
     allowSensitiveFiles: false,
@@ -67,4 +68,20 @@ describe("path policy", () => {
     const file = join(dir, "new.txt");
     expect(assertAllowedPath(file, config(root), { forWrite: true })).toBe(file);
   });
+
+  it("allows paths outside configured roots in unrestricted mode", () => {
+    const root = mkdtempSync(join(tmpdir(), "rr-"));
+    const outside = mkdtempSync(join(tmpdir(), "rr-unrestricted-"));
+    const file = join(outside, "outside.txt");
+    writeFileSync(file, "visible");
+    expect(assertAllowedPath(file, { ...config(root), unrestricted: true })).toBe(file);
+  });
+
+  it("allows sensitive credential paths in unrestricted mode", () => {
+    const root = mkdtempSync(join(tmpdir(), "rr-"));
+    const file = join(root, ".env");
+    writeFileSync(file, "SECRET=x");
+    expect(assertAllowedPath(file, { ...config(root), unrestricted: true })).toBe(file);
+  });
+
 });

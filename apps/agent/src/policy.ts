@@ -41,6 +41,8 @@ export function assertAllowedPath(
   const finalPath =
     options.forWrite && !existsSync(absolute) ? resolve(real, basename(absolute)) : real;
 
+  if (config.unrestricted) return finalPath;
+
   const allowed = config.allowedRoots.some((root) => isWithin(finalPath, realpathSync(root)));
   if (!allowed) throw new Error("Path is outside the allowed roots");
 

@@ -67,11 +67,13 @@ export async function execute(request: RpcRequest, config: AgentConfig): Promise
     }
 
     case "run_command": {
-      if (!config.allowShell) throw new Error("Shell execution is disabled by local policy");
+      if (!config.unrestricted && !config.allowShell) {
+        throw new Error("Shell execution is disabled by local policy");
+      }
       const cwd = assertAllowedPath(asString(request.params.cwd), config);
       const command = asString(request.params.command);
       const timeoutSeconds = Math.min(asNumber(request.params.timeoutSeconds, 30), config.maxCommandSeconds);
-      return runShell(command, cwd, timeoutSeconds, config.maxCommandOutputBytes);
+      return runShell(command, cwd, timeoutSeconds, config.maxCommandOutputBytes, executionEnvironment(config));
     }
   }
 }
@@ -86,7 +88,7 @@ async function runGit(config: AgentConfig, cwdInput: string, args: string[], max
       timeout: config.maxCommandSeconds * 1000,
       maxBuffer: maxBytes,
       env: {
-        ...sanitizedEnvironment(),
+        ...executionEnvironment(config),
         GIT_OPTIONAL_LOCKS: "0",
         GIT_PAGER: "cat",
         PAGER: "cat"
@@ -96,7 +98,13 @@ async function runGit(config: AgentConfig, cwdInput: string, args: string[], max
   return { cwd, stdout, stderr, exitCode: 0 };
 }
 
-async function runShell(command: string, cwd: string, timeoutSeconds: number, maxBytes: number) {
+async function runShell(
+  command: string,
+  cwd: string,
+  timeoutSeconds: number,
+  maxBytes: number,
+  env: NodeJS.ProcessEnv
+) {
   const shell =
     process.platform === "win32"
       ? { file: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", command] }
@@ -107,7 +115,7 @@ async function runShell(command: string, cwd: string, timeoutSeconds: number, ma
       cwd,
       timeout: timeoutSeconds * 1000,
       maxBuffer: maxBytes,
-      env: sanitizedEnvironment()
+      env
     });
     return { cwd, stdout, stderr, exitCode: 0 };
   } catch (error) {
@@ -119,6 +127,10 @@ async function runShell(command: string, cwd: string, timeoutSeconds: number, ma
       exitCode: typeof e.code === "number" ? e.code : 1
     };
   }
+}
+
+function executionEnvironment(config: AgentConfig): NodeJS.ProcessEnv {
+  return config.unrestricted ? { ...process.env } : sanitizedEnvironment();
 }
 
 function sanitizedEnvironment(): NodeJS.ProcessEnv {

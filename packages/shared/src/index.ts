@@ -37,13 +37,22 @@ export const AgentConfigSchema = z.object({
   deviceId: z.string().uuid(),
   deviceToken: z.string().min(32),
   name: z.string().min(1).max(80),
-  allowedRoots: z.array(z.string().min(1)).min(1),
-  allowShell: z.boolean(),
-  allowSensitiveFiles: z.boolean(),
+  unrestricted: z.boolean().default(false),
+  allowedRoots: z.array(z.string().min(1)).default([]),
+  allowShell: z.boolean().default(false),
+  allowSensitiveFiles: z.boolean().default(false),
   maxReadBytes: z.number().int().positive().max(16 * 1024 * 1024),
   maxWriteBytes: z.number().int().positive().max(16 * 1024 * 1024),
   maxCommandOutputBytes: z.number().int().positive().max(16 * 1024 * 1024),
   maxCommandSeconds: z.number().int().positive().max(600)
+}).superRefine((value, ctx) => {
+  if (!value.unrestricted && value.allowedRoots.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["allowedRoots"],
+      message: "At least one allowed root is required unless unrestricted mode is enabled"
+    });
+  }
 });
 
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
