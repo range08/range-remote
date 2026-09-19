@@ -58,7 +58,12 @@ export async function execute(request: RpcRequest, config: AgentConfig): Promise
       const cwd = asString(request.params.cwd);
       const staged = asBoolean(request.params.staged, false);
       const maxBytes = Math.min(asNumber(request.params.maxBytes, 262_144), config.maxCommandOutputBytes);
-      return runGit(config, cwd, ["diff", ...(staged ? ["--cached"] : [])], maxBytes);
+      return runGit(
+        config,
+        cwd,
+        ["diff", "--no-ext-diff", "--no-textconv", ...(staged ? ["--cached"] : [])],
+        maxBytes
+      );
     }
 
     case "run_command": {
@@ -73,11 +78,21 @@ export async function execute(request: RpcRequest, config: AgentConfig): Promise
 
 async function runGit(config: AgentConfig, cwdInput: string, args: string[], maxBytes = config.maxCommandOutputBytes) {
   const cwd = assertAllowedPath(cwdInput, config);
-  const { stdout, stderr } = await execFileAsync("git", args, {
-    cwd,
-    timeout: config.maxCommandSeconds * 1000,
-    maxBuffer: maxBytes
-  });
+  const { stdout, stderr } = await execFileAsync(
+    "git",
+    ["-c", "core.fsmonitor=false", ...args],
+    {
+      cwd,
+      timeout: config.maxCommandSeconds * 1000,
+      maxBuffer: maxBytes,
+      env: {
+        ...sanitizedEnvironment(),
+        GIT_OPTIONAL_LOCKS: "0",
+        GIT_PAGER: "cat",
+        PAGER: "cat"
+      }
+    }
+  );
   return { cwd, stdout, stderr, exitCode: 0 };
 }
 

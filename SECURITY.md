@@ -8,7 +8,7 @@ The security boundary is the local agent policy. The relay cannot grant access o
 
 ## Defaults
 
-- No shell access unless `allowShell` is enabled on the device.
+- No shell access unless `allowShell` is enabled on the device. Filesystem roots do not sandbox an enabled shell; shell commands inherit the OS permissions of the agent process. Use a dedicated low-privilege account or OS/container sandbox when enabling shell execution.
 - Sensitive files and directories are blocked unless the user changes the agent config locally.
 - No remote operation can change the local agent policy.
 - Every device belongs to exactly one authenticated user subject.

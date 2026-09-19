@@ -27,4 +27,27 @@ describe("Store", () => {
     expect(found?.id).toBe(created.id);
     expect(found?.tokenHash).not.toContain(created.token);
   });
+  it("removes only a device owned by the authenticated user", () => {
+    const dir = mkdtempSync(join(tmpdir(), "range-remote-"));
+    const store = new Store(join(dir, "db.sqlite"));
+    const own = store.createDevice("user-1", "own");
+    const other = store.createDevice("user-2", "other");
+
+    expect(store.deleteDeviceForUser("user-1", own.id)).toBe(true);
+    expect(store.getDeviceForUser("user-1", own.id)).toBeNull();
+    expect(store.getDeviceForUser("user-2", other.id)?.id).toBe(other.id);
+  });
+
+  it("removes all devices and pairing codes for one user", () => {
+    const dir = mkdtempSync(join(tmpdir(), "range-remote-"));
+    const store = new Store(join(dir, "db.sqlite"));
+    store.createDevice("user-1", "a");
+    store.createDevice("user-1", "b");
+    const pair = store.createPairingCode("user-1");
+
+    expect(store.removeAllForUser("user-1")).toBe(2);
+    expect(store.listDevices("user-1")).toHaveLength(0);
+    expect(store.consumePairingCode(pair.code)).toBeNull();
+  });
+
 });

@@ -23,9 +23,9 @@ The relay never needs inbound access to the user's device. The agent opens the c
 
 ## Security defaults
 
-- Agent access is restricted to explicitly configured filesystem roots.
+- Filesystem tools are restricted to explicitly configured filesystem roots.
 - Sensitive files such as `.env`, SSH keys, cloud credentials, and private keys are denied by default.
-- Shell execution is disabled unless the user explicitly enables it locally.
+- Shell execution is disabled unless the user explicitly enables it locally. When enabled, shell commands run with the operating-system permissions of the agent process; allowed roots constrain the working directory, not every path a shell command may access. Run the agent as a dedicated low-privilege OS user for shell-enabled deployments.
 - File reads/writes and command output have size limits.
 - Path checks resolve symlinks to prevent escaping allowed roots.
 - Device tokens are generated once and stored only as SHA-256 hashes on the relay.
@@ -88,3 +88,11 @@ npm run dev:agent -- start
 The MCP endpoint is `/mcp`. Production deployments must use HTTPS and a stable hostname. For ChatGPT publication, configure OAuth 2.1, host a privacy policy, verify the MCP domain, prepare review credentials, and keep a review device online.
 
 See `docs/SUBMISSION.md`.
+
+## Support
+
+Use the GitHub issue tracker for non-sensitive support requests. Report security vulnerabilities privately through GitHub Security Advisories.
+
+- Privacy: `PRIVACY.md`
+- Terms: `TERMS.md`
+- Security: `SECURITY.md`

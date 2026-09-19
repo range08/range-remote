@@ -36,6 +36,22 @@ describe("path policy", () => {
     expect(() => assertAllowedPath(file, config(root))).toThrow(/Sensitive/);
   });
 
+  it("allows documented environment templates", () => {
+    const root = mkdtempSync(join(tmpdir(), "rr-"));
+    const file = join(root, ".env.example");
+    writeFileSync(file, "API_URL=https://example.com");
+    expect(assertAllowedPath(file, config(root))).toBe(file);
+  });
+
+  it("blocks OCI credential directories by default", () => {
+    const root = mkdtempSync(join(tmpdir(), "rr-"));
+    const dir = join(root, ".oci");
+    mkdirSync(dir);
+    const file = join(dir, "config");
+    writeFileSync(file, "user=secret");
+    expect(() => assertAllowedPath(file, config(root))).toThrow(/Sensitive/);
+  });
+
   it("blocks traversal outside an allowed root", () => {
     const root = mkdtempSync(join(tmpdir(), "rr-"));
     const outside = mkdtempSync(join(tmpdir(), "rr-out-"));
