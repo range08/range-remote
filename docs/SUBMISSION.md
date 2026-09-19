@@ -4,14 +4,14 @@ Range Remote is intended for submission as a public remote-MCP plugin.
 
 ## Production endpoint
 
-- MCP server: `https://range08.shop/mcp`
-- OAuth/OIDC issuer and resource origin: `https://range08.shop`
-- OIDC discovery: `https://range08.shop/.well-known/openid-configuration`
-- Protected resource metadata: `https://range08.shop/.well-known/oauth-protected-resource`
-- Registration endpoint: `https://range08.shop/reg`
-- Privacy page exposed by the MCP service: `https://range08.shop/privacy`
+- MCP server: `https://remotemcp.range08.shop/mcp`
+- OAuth/OIDC issuer and resource origin: `https://remotemcp.range08.shop`
+- OIDC discovery: `https://remotemcp.range08.shop/.well-known/openid-configuration`
+- Protected resource metadata: `https://remotemcp.range08.shop/.well-known/oauth-protected-resource`
+- Registration endpoint: `https://remotemcp.range08.shop/reg`
+- Privacy page exposed by the MCP service: `https://remotemcp.range08.shop/privacy`
 
-The production deployment uses a single public origin behind nginx. OAuth/OIDC paths are proxied to `range-remote-auth`; MCP and agent paths are proxied to `range-remote`.
+The production deployment uses the dedicated `remotemcp.range08.shop` origin behind `range-remote-gateway`. Cloudflare Tunnel routes that hostname directly to the gateway; OAuth/OIDC paths are proxied to `range-remote-auth`, while MCP and agent paths are proxied to `range-remote`. The personal `range08.shop` homepage is separate and contains no Range Remote routes.
 
 ## Required before review
 
@@ -28,7 +28,7 @@ The production deployment uses a single public origin behind nginx. OAuth/OIDC p
 - [x] Domain challenge route exists at `/.well-known/openai-apps-challenge`.
 - [x] Public privacy, terms, security, and support documents exist.
 - [x] Device removal and all-device deletion are implemented.
-- [x] Production relay and authorization containers run as non-root users.
+- [x] Production gateway, relay, and authorization containers run as non-root users.
 - [x] Production services are healthy and reachable through the existing Cloudflare-backed public origin.
 
 ### OpenAI account and review access
