@@ -4,8 +4,11 @@ import type { AgentHub } from "./agent-hub.js";
 import { createOpenAiToolRegistry } from "./openai-compat.js";
 import type { Store } from "./store.js";
 import { config } from "./config.js";
+import { FixedWindowRateLimiter } from "./rate-limit.js";
 
 const securitySchemes = [{ type: "oauth2" as const, scopes: [config.AUTH_REQUIRED_SCOPE] }];
+const userDeviceRateLimiter = new FixedWindowRateLimiter(8192);
+const userConcurrentDeviceRequests = new Map<string, number>();
 
 function meta(invoking: string, invoked: string, extra: Record<string, unknown> = {}) {
   return {
@@ -247,12 +250,41 @@ async function withDevice(
   kind: Parameters<AgentHub["call"]>[1],
   params: Record<string, unknown>
 ) {
+  let release: (() => void) | undefined;
   try {
     const device = store.getDeviceForUser(userSub, deviceId);
     if (!device) throw new Error("Device not found");
+    release = acquireUserDeviceSlot(userSub);
     const result = await hub.call(device.id, kind, params);
     return text(result);
   } catch (error) {
     return errorResult(error);
+  } finally {
+    release?.();
   }
+}
+
+function acquireUserDeviceSlot(userSub: string): () => void {
+  if (!userDeviceRateLimiter.allow(
+    userSub,
+    config.USER_DEVICE_REQUESTS_PER_MINUTE,
+    60_000
+  )) {
+    throw new Error("Relay request rate exceeded; try again shortly");
+  }
+
+  const active = userConcurrentDeviceRequests.get(userSub) ?? 0;
+  if (active >= config.USER_CONCURRENT_DEVICE_REQUESTS) {
+    throw new Error("Too many concurrent device requests for this account");
+  }
+  userConcurrentDeviceRequests.set(userSub, active + 1);
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const current = userConcurrentDeviceRequests.get(userSub) ?? 1;
+    if (current <= 1) userConcurrentDeviceRequests.delete(userSub);
+    else userConcurrentDeviceRequests.set(userSub, current - 1);
+  };
 }

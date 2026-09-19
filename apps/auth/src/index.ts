@@ -104,6 +104,7 @@ app.set("trust proxy", 1);
 const formBody = express.urlencoded({ extended: false, limit: "32kb" });
 const allowedHosts = new Set([
   new URL(config.issuer).hostname,
+  "range-remote-auth",
   "localhost",
   "127.0.0.1",
   "::1",
@@ -356,12 +357,17 @@ function fixedWindowRateLimit(limit: number, windowMs: number) {
     const key = req.header("cf-connecting-ip") ?? req.ip ?? "unknown";
     const current = buckets.get(key);
     if (!current || current.resetAt <= now) {
-      buckets.set(key, { count: 1, resetAt: now + windowMs });
-      if (buckets.size > 4096) {
+      if (!current && buckets.size >= 4096) {
         for (const [bucketKey, bucket] of buckets) {
           if (bucket.resetAt <= now) buckets.delete(bucketKey);
         }
+        while (buckets.size >= 4096) {
+          const oldest = buckets.keys().next().value as string | undefined;
+          if (oldest === undefined) break;
+          buckets.delete(oldest);
+        }
       }
+      buckets.set(key, { count: 1, resetAt: now + windowMs });
       next();
       return;
     }

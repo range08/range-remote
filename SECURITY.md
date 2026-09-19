@@ -20,6 +20,12 @@ The primary device-side security boundary is the local agent policy. Filesystem 
 - OAuth authorization uses authorization code + PKCE S256, RFC 8707 resource indicators, short-lived JWT access tokens, persistent signing keys, and exact issuer/audience/scope validation at the MCP relay.
 - The built-in authorization service stores password verifiers using randomly salted scrypt hashes and never stores plaintext passwords.
 - OAuth signing keys and SQLite databases live in non-public persistent volumes; `.env`, runtime data, and generated keys are excluded from Git and Docker build contexts.
+- The public Cloudflare network terminates at the gateway. Auth and relay containers use an internal-only Docker network with no published host ports and no direct Internet egress.
+- Auth signing/cookie secrets are injected only into the authorization container; the relay receives no cookie-signing secret.
+- Production containers run non-root with read-only root filesystems, all Linux capabilities dropped, `no-new-privileges`, and bounded CPU, memory, and PID resources.
+- Agent WebSockets use bounded payloads, heartbeat liveness checks, connection caps, and global/per-device pending-call caps.
+- Authenticated device operations have per-account rate and concurrency caps. These protect relay availability; they do not reduce the permissions granted by the local agent policy.
+- Pairing storage keeps only the newest outstanding code per account and caps persistent device records per account.
 
 ## Reporting vulnerabilities
 

@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
@@ -21,6 +21,7 @@ export class Store {
   constructor(path = config.DATABASE_PATH) {
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
+    chmodSync(path, 0o600);
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS devices (
@@ -45,8 +46,8 @@ export class Store {
   createPairingCode(userSub: string): { code: string; expiresAt: string } {
     const now = Date.now();
     this.db.prepare(
-      "DELETE FROM pairing_codes WHERE expires_at < ? OR consumed_at IS NOT NULL"
-    ).run(now);
+      "DELETE FROM pairing_codes WHERE expires_at < ? OR consumed_at IS NOT NULL OR user_sub = ?"
+    ).run(now, userSub);
 
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const chars = Array.from({ length: 12 }, () => alphabet[randomInt(alphabet.length)]!);
@@ -73,6 +74,13 @@ export class Store {
   }
 
   createDevice(userSub: string, name: string): { id: string; token: string } {
+    const count = this.db.prepare(
+      "SELECT COUNT(*) AS count FROM devices WHERE user_sub=?"
+    ).get(userSub) as { count: number };
+    if (Number(count.count) >= config.MAX_DEVICES_PER_USER) {
+      throw new Error("Device limit reached for this account");
+    }
+
     const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const now = new Date().toISOString();
