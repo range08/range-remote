@@ -40,8 +40,8 @@ export function registerUser(username: string, email: string, password: string):
   if (normalizedEmail.length > 254 || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
     throw new Error("Invalid email address");
   }
-  if (password.length < 12 || password.length > 256) {
-    throw new Error("Password must be between 12 and 256 characters");
+  if (password.length < 8 || password.length > 256) {
+    throw new Error("Password must be between 8 and 256 characters");
   }
 
   const salt = randomBytes(16);

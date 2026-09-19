@@ -45,6 +45,13 @@ describe("authorization persistence", () => {
       .toThrow("Username or email is already registered");
   });
 
+  it("accepts 8-character passwords and rejects shorter passwords", () => {
+    const user = registerUser("eightchars", "eight@example.com", "12345678");
+    expect(verifyUser("eightchars", "12345678")?.id).toBe(user.id);
+    expect(() => registerUser("too-short", "short@example.com", "1234567"))
+      .toThrow("Password must be between 8 and 256 characters");
+  });
+
   it("creates a persistent private JWKS with restrictive permissions", () => {
     const first = loadOrCreateJwks();
     const second = loadOrCreateJwks();

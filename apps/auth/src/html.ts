@@ -69,7 +69,7 @@ ${error ? `<p class="error">${esc(error)}</p>` : ""}
 <input type="hidden" name="returnTo" value="${esc(returnTo)}">
 <label>Username<input name="username" autocomplete="username" required minlength="3" maxlength="40"></label>
 <label>Email<input type="email" name="email" autocomplete="email" required></label>
-<label>Password<input type="password" name="password" autocomplete="new-password" required minlength="12"></label>
+<label>Password<input type="password" name="password" autocomplete="new-password" required minlength="8"></label>
 <button type="submit">Create account</button>
 </form>`);
 }
