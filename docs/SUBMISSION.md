@@ -130,6 +130,7 @@ The server and repository can be prepared automatically, but the following requi
 2. Confirm `api.apps.read` and `api.apps.write` permissions.
 3. Select availability countries/regions.
 4. Supply the final listing logo.
-5. Create the reviewer account and pair a dedicated review device.
-6. Enter the domain challenge value supplied by the submission portal.
-7. Submit the completed draft through the plugin submission portal.
+5. Temporarily set `AUTH_ALLOW_REGISTRATION=true`, create the reviewer account, then restore it to `false`.
+6. Pair a dedicated review device to the reviewer account.
+7. Enter the domain challenge value supplied by the submission portal.
+8. Submit the completed draft through the plugin submission portal.

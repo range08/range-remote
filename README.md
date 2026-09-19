@@ -55,7 +55,7 @@ npm run build
 npm test
 ```
 
-Copy `.env.example` to `.env`, set two cookie-signing keys, then start the authorization server and relay in separate terminals:
+Copy `.env.example` to `.env`, set two cookie-signing keys, and set `AUTH_ALLOW_REGISTRATION=true` only while creating an account. Registration is disabled by default. Then start the authorization server and relay in separate terminals:
 
 ```bash
 npm --workspace @range-remote/auth run dev
