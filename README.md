@@ -131,6 +131,50 @@ Inspect the saved local mode without printing the device token:
 node apps/agent/dist/index.js status
 ```
 
+### Windows background service
+
+On Windows, a paired agent can be installed as a real Windows Service so it starts
+automatically after boot without leaving a Command Prompt or PowerShell window open.
+
+Run this from the repository:
+
+```powershell
+npm run service:install
+```
+
+The installer builds the agent, requests UAC elevation, grants the current Windows
+account the `Log on as a service` right, and asks for that account's password through
+the Windows credential prompt. Use the account password, not a Windows Hello PIN.
+The password is passed to Windows through `PSCredential`; it is not written to the
+Range Remote configuration, WinSW XML, repository, or command line.
+
+The service is registered as `RangeRemoteAgent` with Automatic (Delayed Start).
+It runs under the same Windows account that installed it, retains the existing local
+pairing policy and device token, and is configured for automatic recovery after
+unexpected service failures. The service process runs in Windows' non-interactive
+service session, so it does not create a visible console window on the desktop.
+
+Manage it with:
+
+```powershell
+npm run service:status
+npm run service:stop
+npm run service:start
+npm run service:restart
+npm run service:uninstall
+```
+
+Service wrapper files and rolling logs are stored under
+`%LOCALAPPDATA%\Range Remote\service`. Uninstalling the service removes those
+service files but deliberately preserves the paired agent configuration under
+`%USERPROFILE%\.config\range-remote\config.json`.
+
+The installer downloads WinSW 2.12.0 from the official WinSW GitHub release and
+checks a pinned SHA-256 digest before installation. See `THIRD_PARTY_NOTICES.md`
+for its license. The service currently executes the built agent from this repository,
+so keep the repository at the same path while the service is installed. Reinstall
+the service after moving the repository or Node.js installation.
+
 ## Production
 
 The production MCP endpoint is `https://remotemcp.range08.shop/mcp`. Range Remote uses its own dedicated `range-remote-gateway` on the `remotemcp.range08.shop` origin; it is not routed through or combined with the personal `range08.shop` homepage. Cloudflare Tunnel reaches only the gateway. The authorization server and MCP relay live on a separate internal-only Docker network and have no published host ports or direct Internet egress.

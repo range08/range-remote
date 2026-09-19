@@ -30,3 +30,36 @@ jobs:
       - run: docker build -f apps/server/Dockerfile .
       - run: docker build -f apps/auth/Dockerfile .
       - run: docker build -f apps/gateway/Dockerfile .
+
+  windows-agent:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Parse Windows service script with Windows PowerShell
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./scripts/windows-service.ps1),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+      - run: npm run build --workspace @range-remote/shared
+      - run: npm run check --workspace @range-remote/agent
+      - run: npm run test --workspace @range-remote/agent
+      - run: npm run build --workspace @range-remote/agent
+      - name: Exercise non-mutating service status command
+        shell: powershell
+        run: node apps/agent/dist/index.js service-status
+

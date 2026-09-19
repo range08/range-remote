@@ -15,7 +15,13 @@
     "check": "npm run build --workspace @range-remote/shared && npm run check --workspace @range-remote/auth && npm run check --workspace @range-remote/agent && npm run check --workspace @range-remote/server",
     "test": "npm run build --workspace @range-remote/shared && npm run test --workspace @range-remote/auth && npm run test --workspace @range-remote/agent && npm run test --workspace @range-remote/server",
     "dev:server": "npm --workspace @range-remote/server run dev",
-    "dev:agent": "npm --workspace @range-remote/agent run dev"
+    "dev:agent": "npm --workspace @range-remote/agent run dev",
+    "service:install": "npm run build --workspace @range-remote/shared && npm run build --workspace @range-remote/agent && node apps/agent/dist/index.js install-service",
+    "service:uninstall": "node apps/agent/dist/index.js uninstall-service",
+    "service:start": "node apps/agent/dist/index.js service-start",
+    "service:stop": "node apps/agent/dist/index.js service-stop",
+    "service:restart": "node apps/agent/dist/index.js service-restart",
+    "service:status": "node apps/agent/dist/index.js service-status"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
