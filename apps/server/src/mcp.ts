@@ -42,7 +42,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
     { name: "Range Remote", version: "0.1.0" },
     {
       instructions:
-        "Use read-only tools before write or shell tools. Respect local agent policy. Never try to bypass blocked paths, sensitive-file restrictions, disabled shell access, or allowed-root boundaries."
+        "Use read-only tools before write or shell tools. Respect the local mode selected by the user. Restricted agents enforce path, sensitive-file, and shell policy; unrestricted agents intentionally expose the operating-system permissions of the agent process."
     }
   );
 
@@ -156,7 +156,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   tools.register("read_file", {
     title: "Read text file",
-    description: "Reads a UTF-8 text file inside an allowed root. Sensitive credential paths are denied by the local agent by default.",
+    description: "Reads a UTF-8 text file. Restricted agents enforce allowed roots and sensitive-file policy; unrestricted agents allow any path the local OS user can read.",
     inputSchema: z.object({
       device: z.string().uuid(),
       path: z.string().min(1),
@@ -198,7 +198,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   tools.register("write_file", {
     title: "Write text file",
-    description: "Creates or overwrites one UTF-8 text file inside an allowed root. This can destroy existing file content when overwrite is true.",
+    description: "Creates or overwrites one UTF-8 text file. Restricted agents enforce allowed roots; unrestricted agents allow any path the local OS user can write. This can destroy existing file content when overwrite is true.",
     inputSchema: z.object({
       device: z.string().uuid(),
       path: z.string().min(1),
@@ -217,7 +217,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   tools.register("run_command", {
     title: "Run device shell command",
-    description: "Runs one shell command only when shell access was explicitly enabled on the local agent. The working directory must be within an allowed root, but the command itself runs with the operating-system permissions of the agent process and can modify data or access the network.",
+    description: "Runs one shell command. Restricted agents require local shell opt-in and an allowed working directory. Unrestricted agents intentionally run with the full operating-system permissions and environment of the agent process.",
     inputSchema: z.object({
       device: z.string().uuid(),
       cwd: z.string().min(1),

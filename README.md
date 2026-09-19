@@ -1,6 +1,6 @@
 # Range Remote
 
-Range Remote is an open-source remote MCP service designed for ChatGPT plugins. It lets a user connect a computer or server through an outbound-only agent and then use narrowly described MCP tools for filesystem inspection, file editing, Git inspection, and optional shell execution.
+Range Remote is an open-source remote MCP service designed for ChatGPT plugins. It lets a user connect a computer or server through an outbound-only agent and then use narrowly described MCP tools for filesystem inspection, file editing, Git inspection, and shell execution under a locally selected restricted or unrestricted mode.
 
 ## Architecture
 
@@ -19,19 +19,33 @@ Range Remote relay (MCP over HTTPS)
       v
 Range Remote agent
       |
-      +-- allowed filesystem roots
-      +-- optional shell
+      +-- restricted mode: allowed roots / sensitive-file policy / optional shell
+      +-- unrestricted mode: full permissions of the local OS user
 ```
 
-The relay never needs inbound access to the user's device. The agent opens the connection outward and enforces local policy before every operation.
+The relay never needs inbound access to the user's device. The agent opens the connection outward. Local access policy is chosen on the device and cannot be changed remotely.
+
+## Local access modes
+
+Restricted mode remains the default for new pairings. It limits filesystem operations to explicit roots, blocks common credential paths by default, and requires a separate shell opt-in.
+
+For a trusted personal device, `--unrestricted` deliberately removes those application-level permission barriers. Filesystem and Git operations may reach any path the agent OS user can access, sensitive-file filtering is disabled, shell execution is enabled, and child processes inherit the agent's full environment. Operating-system permissions and UAC/sudo still apply. Relay-side authentication, device ownership checks, rate limits, and OCI isolation are unchanged.
+
+```bash
+npm run dev:agent -- pair \
+  --server https://remotemcp.range08.shop \
+  --code ABCDEF-GHJKLM \
+  --name my-pc \
+  --unrestricted
+```
 
 ## Security defaults
 
-- Filesystem tools are restricted to explicitly configured filesystem roots.
-- Sensitive files such as `.env`, SSH keys, cloud credentials, and private keys are denied by default.
-- Shell execution is disabled unless the user explicitly enables it locally. When enabled, shell commands run with the operating-system permissions of the agent process; allowed roots constrain the working directory, not every path a shell command may access. Run the agent as a dedicated low-privilege OS user for shell-enabled deployments.
+- Restricted mode confines filesystem tools to explicitly configured roots; unrestricted mode intentionally removes this application-level boundary.
+- Restricted mode denies common sensitive credential paths by default; unrestricted mode intentionally permits them subject to OS permissions.
+- Restricted mode disables shell execution unless enabled locally. Unrestricted mode enables shell automatically and passes through the agent process environment. In either mode, shell commands run with the operating-system permissions of the agent process.
 - File reads/writes and command output have size limits.
-- Path checks resolve symlinks to prevent escaping allowed roots.
+- Restricted path checks resolve symlinks before enforcing allowed roots.
 - Device tokens are generated once and stored only as SHA-256 hashes on the relay.
 - MCP access requires OAuth 2.1 bearer tokens.
 - Tools advertise `readOnlyHint`, `destructiveHint`, and `openWorldHint` to ChatGPT.

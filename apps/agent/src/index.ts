@@ -14,7 +14,8 @@ if (command === "pair") {
   await start();
 } else {
   console.error("Usage:");
-  console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell]");
+  console.error("  range-remote-agent pair --server URL --code CODE --name NAME --unrestricted");
+  console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell] [--allow-sensitive-files]");
   console.error("  range-remote-agent start");
   process.exit(2);
 }
@@ -28,13 +29,16 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
   const server = serverUrl.toString().replace(/\/+$/, "");
   const code = required(flags, "code");
   const name = required(flags, "name");
+  const unrestricted = flags.has("unrestricted");
   const roots = (flags.get("root") ?? []).map((root) => {
     const absolute = resolve(root);
     const stat = statSync(absolute);
     if (!stat.isDirectory()) throw new Error(`Allowed root is not a directory: ${absolute}`);
     return realpathSync(absolute);
   });
-  if (roots.length === 0) throw new Error("At least one --root is required");
+  if (!unrestricted && roots.length === 0) {
+    throw new Error("At least one --root is required unless --unrestricted is used");
+  }
 
   const response = await fetch(`${server}/agent/pair`, {
     method: "POST",
@@ -50,9 +54,10 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
     deviceId: payload.deviceId,
     deviceToken: payload.deviceToken,
     name,
+    unrestricted,
     allowedRoots: roots,
-    allowShell: flags.has("allow-shell"),
-    allowSensitiveFiles: false,
+    allowShell: unrestricted || flags.has("allow-shell"),
+    allowSensitiveFiles: unrestricted || flags.has("allow-sensitive-files"),
     maxReadBytes: 1_048_576,
     maxWriteBytes: 524_288,
     maxCommandOutputBytes: 262_144,
@@ -60,7 +65,11 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
   };
 
   saveConfig(config);
-  console.error(`Paired ${name}. Config saved to ${configPath}`);
+  console.error(
+    unrestricted
+      ? `Paired ${name} in unrestricted mode. Config saved to ${configPath}`
+      : `Paired ${name}. Config saved to ${configPath}`
+  );
 }
 
 async function start(): Promise<void> {
@@ -84,7 +93,11 @@ async function connectOnce(config: AgentConfig, wsUrl: URL): Promise<void> {
       headers: { authorization: `Bearer ${config.deviceToken}` }
     });
 
-    ws.on("open", () => console.error(`Connected as ${config.name}`));
+    ws.on("open", () => console.error(
+      config.unrestricted
+        ? `Connected as ${config.name} (unrestricted local access)`
+        : `Connected as ${config.name}`
+    ));
 
     ws.on("message", async (raw) => {
       let parsed;
@@ -118,11 +131,12 @@ async function connectOnce(config: AgentConfig, wsUrl: URL): Promise<void> {
 
 function parseArgs(args: string[]): Map<string, string[]> {
   const result = new Map<string, string[]>();
+  const booleanFlags = new Set(["allow-shell", "allow-sensitive-files", "unrestricted"]);
   for (let i = 0; i < args.length; i++) {
     const item = args[i]!;
     if (!item.startsWith("--")) throw new Error(`Unexpected argument: ${item}`);
     const key = item.slice(2);
-    if (key === "allow-shell") {
+    if (booleanFlags.has(key)) {
       result.set(key, ["true"]);
       continue;
     }
