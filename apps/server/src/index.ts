@@ -44,8 +44,19 @@ app.get("/internal/usage", (req, res) => {
     res.status(400).json({ error: "invalid_user" });
     return;
   }
+  const devices = store.listDevices(userSub).map((device) => ({
+    id: device.id,
+    name: device.name,
+    online: hub.isOnline(device.id),
+    createdAt: device.createdAt,
+    lastSeen: device.lastSeen
+  }));
+
   res.setHeader("Cache-Control", "no-store");
-  res.json(store.getUsageStats(userSub));
+  res.json({
+    ...store.getUsageStats(userSub),
+    devices
+  });
 });
 
 

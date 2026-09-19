@@ -18,6 +18,13 @@ const UsageStatsSchema = z.object({
   todayCalls: z.number().int().nonnegative(),
   totalCalls: z.number().int().nonnegative(),
   activeDays: z.number().int().nonnegative(),
+  devices: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    online: z.boolean(),
+    createdAt: z.string(),
+    lastSeen: z.string().nullable()
+  })),
   topTools: z.array(z.object({
     name: z.string(),
     calls: z.number().int().nonnegative(),

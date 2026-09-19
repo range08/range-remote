@@ -54,9 +54,9 @@ button,.button{display:inline-block;margin-top:20px;background:#15171a;color:#ff
 .usage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}.usage-head p{margin:4px 0}.usage-head form{margin:0}.usage-head button{margin:0}
 .hero{display:flex;align-items:end;justify-content:space-between;gap:20px;padding:22px;border-radius:16px;background:#15171a;color:#fff;margin:18px 0}.hero .label{font-size:14px;color:#c5c8cc}.hero .number{font-size:42px;font-weight:750;line-height:1.05;margin-top:6px}.hero .muted{color:#c5c8cc;font-size:13px;margin-top:7px}.pill{display:inline-block;border:1px solid #ffffff33;border-radius:999px;padding:6px 10px;font-size:13px;color:#fff}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.metric{border:1px solid #e3e6ea;border-radius:14px;padding:16px;background:#fff}.metric .k{color:#737980;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.metric .v{font-size:24px;font-weight:700;margin-top:5px}
-.section{margin-top:22px}.section h2{font-size:17px;margin:0 0 10px}.chart{height:150px;display:flex;align-items:end;gap:4px;padding:12px 4px 4px;border-bottom:1px solid #dfe3e7}.bar{flex:1;min-width:3px;background:#15171a;border-radius:4px 4px 0 0;opacity:.86}.bar.zero{opacity:.12}.chart-labels{display:flex;justify-content:space-between;color:#858b92;font-size:11px;margin-top:6px}
+.section{margin-top:22px}.section h2{font-size:17px;margin:0}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.section-meta{color:#737980;font-size:13px}.device-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.device{border:1px solid #e3e6ea;border-radius:14px;padding:15px;background:#fff}.device-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.device-name{font-weight:700;overflow-wrap:anywhere}.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;white-space:nowrap}.status::before{content:"";width:8px;height:8px;border-radius:999px;background:#8a9097}.status.online{color:#18794e}.status.online::before{background:#22a06b}.device-meta{margin-top:8px;color:#737980;font-size:12px;line-height:1.55}.chart{height:150px;display:flex;align-items:end;gap:4px;padding:12px 4px 4px;border-bottom:1px solid #dfe3e7}.bar{flex:1;min-width:3px;background:#15171a;border-radius:4px 4px 0 0;opacity:.86}.bar.zero{opacity:.12}.chart-labels{display:flex;justify-content:space-between;color:#858b92;font-size:11px;margin-top:6px}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;border-bottom:1px solid #edf0f2;padding:10px 8px}th{color:#6d737a;font-size:12px;font-weight:600}.right{text-align:right}.ok{color:#18794e}.bad{color:#b42318}.empty{padding:20px;border:1px dashed #ccd1d7;border-radius:12px;color:#6b7178;text-align:center}.footer-note{margin-top:22px;font-size:12px;color:#858b92}
-@media(max-width:760px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.usage-head{display:block}.usage-head form{margin-top:12px}.hero{align-items:flex-start;flex-direction:column}.hero .number{font-size:36px}table{font-size:12px}th,td{padding:9px 5px}}
+@media(max-width:760px){.metrics,.device-grid{grid-template-columns:1fr}.usage-head{display:block}.usage-head form{margin-top:12px}.hero{align-items:flex-start;flex-direction:column}.hero .number{font-size:36px}.section-head{align-items:flex-start;flex-direction:column;gap:3px}table{font-size:12px}th,td{padding:9px 5px}}
 </style>
 </head><body><main><div class="card">${body}</div></main></body></html>`;
 }
@@ -151,6 +151,16 @@ export function usagePage(
   const recentRows = stats.recent.map((entry) => `
 <tr><td>${esc(shortTimestamp(entry.at))}</td><td><code>${esc(entry.toolName)}</code></td><td>${esc(entry.deviceName ?? "—")}</td><td class="right ${entry.success ? "ok" : "bad"}">${entry.success ? "Success" : "Failed"}</td><td class="right">${formatDuration(entry.durationMs)}</td></tr>`).join("");
 
+  const onlineDevices = stats.devices.filter((device) => device.online).length;
+  const deviceCards = stats.devices.map((device) => `
+<div class="device">
+  <div class="device-top">
+    <div class="device-name">${esc(device.name)}</div>
+    <span class="status${device.online ? " online" : ""}">${device.online ? "Online" : "Offline"}</span>
+  </div>
+  <div class="device-meta">${device.online ? "Connected now" : `Last seen ${esc(relativeTimestamp(device.lastSeen, stats.period.generatedAt))}`}<br>Paired ${esc(shortDate(device.createdAt))}</div>
+</div>`).join("");
+
   return page("Usage", `
 <div class="usage-head">
   <div><h1>Range Remote Usage</h1><p>Signed in as <strong>@${esc(username)}</strong></p></div>
@@ -166,7 +176,11 @@ export function usagePage(
   <div class="metric"><div class="k">Avg latency</div><div class="v">${formatDuration(month.avgDurationMs)}</div></div>
   <div class="metric"><div class="k">All-time calls</div><div class="v">${formatNumber(stats.totalCalls)}</div></div>
 </div>
-<div class="section"><h2>Last 30 days</h2><div class="chart">${bars}</div><div class="chart-labels"><span>${esc(firstDay)}</span><span>${esc(lastDay)}</span></div></div>
+<div class="section">
+  <div class="section-head"><h2>Connected devices</h2><div class="section-meta">${formatNumber(onlineDevices)} online · ${formatNumber(stats.devices.length)} paired</div></div>
+  ${deviceCards ? `<div class="device-grid">${deviceCards}</div>` : '<div class="empty">No devices are paired with this account.</div>'}
+</div>
+<div class="section"><div class="section-head"><h2>Last 30 days</h2></div><div class="chart">${bars}</div><div class="chart-labels"><span>${esc(firstDay)}</span><span>${esc(lastDay)}</span></div></div>
 <div class="section"><h2>Top tools this month</h2>${toolRows ? `<table><thead><tr><th>Tool</th><th class="right">Calls</th><th class="right">Success</th><th class="right">Avg latency</th></tr></thead><tbody>${toolRows}</tbody></table>` : '<div class="empty">No tool calls recorded this month.</div>'}</div>
 <div class="section"><h2>Recent activity</h2>${recentRows ? `<table><thead><tr><th>Time (UTC)</th><th>Tool</th><th>Device</th><th class="right">Result</th><th class="right">Latency</th></tr></thead><tbody>${recentRows}</tbody></table>` : '<div class="empty">No usage has been recorded yet.</div>'}</div>
 <p class="footer-note">Usage tracking ${stats.trackingSince ? `started ${esc(shortTimestamp(stats.trackingSince))} UTC` : "starts with the first tool call after analytics was enabled"}. Calendar boundaries and chart dates use ${esc(stats.period.timezone)}. Only tool name, result status, duration, client/device identifiers, and time are stored; tool arguments and outputs are not stored in usage analytics.</p>`, true);
@@ -185,4 +199,24 @@ function shortTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toISOString().replace("T", " ").slice(0, 16);
+}
+
+function shortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString().slice(0, 10);
+}
+
+function relativeTimestamp(value: string | null, generatedAt: string): string {
+  if (!value) return "never";
+  const date = new Date(value);
+  const now = new Date(generatedAt);
+  if (Number.isNaN(date.getTime()) || Number.isNaN(now.getTime())) return shortTimestamp(value) + " UTC";
+
+  const elapsed = Math.max(0, now.getTime() - date.getTime());
+  if (elapsed < 60_000) return "just now";
+  if (elapsed < 60 * 60_000) return `${Math.floor(elapsed / 60_000)}m ago`;
+  if (elapsed < 24 * 60 * 60_000) return `${Math.floor(elapsed / (60 * 60_000))}h ago`;
+  if (elapsed < 7 * 24 * 60 * 60_000) return `${Math.floor(elapsed / (24 * 60 * 60_000))}d ago`;
+  return shortTimestamp(value) + " UTC";
 }
