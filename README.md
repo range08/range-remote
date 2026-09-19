@@ -7,9 +7,13 @@ Range Remote is an open-source remote MCP service designed for ChatGPT plugins. 
 ```text
 ChatGPT / Codex
       |
-      | OAuth 2.1 + MCP over HTTPS
+      | OAuth 2.1 / OIDC
       v
-Range Remote relay
+Range Remote auth
+      |
+      | JWT bearer token
+      v
+Range Remote relay (MCP over HTTPS)
       |
       | authenticated WebSocket
       v
@@ -35,6 +39,7 @@ The relay never needs inbound access to the user's device. The agent opens the c
 ## Repository layout
 
 - `apps/server`: public HTTPS MCP relay and device WebSocket gateway.
+- `apps/auth`: OAuth 2.1 / OpenID Connect authorization server with DCR, PKCE S256, RFC 8707 resource indicators, SQLite persistence, and persistent signing keys.
 - `apps/agent`: local/remote device agent.
 - `packages/shared`: RPC schemas shared by relay and agent.
 - `docs/SUBMISSION.md`: OpenAI plugin submission checklist.
@@ -50,11 +55,14 @@ npm run build
 npm test
 ```
 
-Copy `.env.example` to `.env`, configure an OAuth provider, then start the relay:
+Copy `.env.example` to `.env`, set two cookie-signing keys, then start the authorization server and relay in separate terminals:
 
 ```bash
+npm --workspace @range-remote/auth run dev
 npm run dev:server
 ```
+
+The built-in authorization server supports dynamic client registration, authorization code + PKCE S256, refresh tokens through `offline_access`, and resource-bound JWT access tokens.
 
 Pair an agent:
 
@@ -85,7 +93,7 @@ npm run dev:agent -- start
 
 ## Production
 
-The MCP endpoint is `/mcp`. Production deployments must use HTTPS and a stable hostname. For ChatGPT publication, configure OAuth 2.1, host a privacy policy, verify the MCP domain, prepare review credentials, and keep a review device online.
+The MCP endpoint is `/mcp`. The tested production layout uses two stable HTTPS origins: one for the MCP relay (for example `https://remote.example.com`) and one for the authorization issuer (for example `https://auth.example.com`). A single-origin deployment is also possible behind a path-aware reverse proxy, but only when every OAuth discovery, registration, authorization, token, JWKS, interaction, and MCP route is mapped to the correct backend and the configured issuer/resource origins remain consistent. `docker-compose.yml` runs both services as non-root containers with separate persistent volumes and attaches them to the external `cloudflare` network. For ChatGPT publication, verify the MCP domain, prepare review credentials, and keep a review device online.
 
 See `docs/SUBMISSION.md`.
 

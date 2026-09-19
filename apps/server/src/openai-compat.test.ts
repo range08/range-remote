@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { createOpenAiToolRegistry } from "./openai-compat.js";
 
@@ -19,6 +20,7 @@ describe("OpenAI tool compatibility", () => {
     registry.register("example", {
       title: "Example",
       description: "Example tool",
+      outputSchema: z.object({ id: z.string().min(1) }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
     }, async () => ({ content: [] }));
     registry.installListCompatibility();
@@ -28,5 +30,9 @@ describe("OpenAI tool compatibility", () => {
     expect(result.tools[0]?.securitySchemes).toEqual(securitySchemes);
     expect(result.tools[0]?._meta?.securitySchemes).toEqual(securitySchemes);
     expect(result.tools[0]?.annotations?.readOnlyHint).toBe(true);
+    expect(result.tools[0]?.outputSchema?.type).toBe("object");
+    expect(result.tools[0]?.outputSchema?.properties?.id?.type).toBe("string");
+    expect(result.tools[0]?.outputSchema?.required).toEqual(["id"]);
+    expect(result.tools[0]?.outputSchema?.additionalProperties).toBe(false);
   });
 });

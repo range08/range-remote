@@ -45,12 +45,25 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
 
   const tools = createOpenAiToolRegistry(server, securitySchemes);
 
+  const profileSchema = z.object({
+    id: z.string().min(1).regex(/\S/).describe(
+      "Opaque profile identifier that remains stable across token refresh and reconnection."
+    )
+  }).strict();
+
   tools.register("profile", {
     title: "Connection profile",
-    description: "Returns the authenticated Range Remote profile identifier without inspecting any device.",
+    description: "Returns the profile represented by this request's authenticated credentials.",
+    outputSchema: profileSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: meta("Reading profile…", "Profile ready", { "openai/profile": true })
-  }, async () => text({ profile: userSub }));
+  }, async () => {
+    const profile = { id: userSub };
+    return {
+      structuredContent: profile,
+      content: [{ type: "text" as const, text: JSON.stringify(profile) }]
+    };
+  });
 
   tools.register("list_devices", {
     title: "List paired devices",
