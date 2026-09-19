@@ -42,7 +42,7 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
     { name: "Range Remote", version: "0.1.0" },
     {
       instructions:
-        "Use read-only tools before write or shell tools. Respect the local mode selected by the user. Restricted agents enforce path, sensitive-file, and shell policy; unrestricted agents intentionally expose the operating-system permissions of the agent process."
+        "Use read-only tools before write or shell tools. Respect the local mode selected by the user. Restricted agents enforce path, sensitive-file, shell, and MCP policy; unrestricted agents intentionally expose the operating-system permissions of the agent process. For substantial device work where a reusable workflow may apply, call list_skills with the working directory, inspect only the returned metadata, and read only a relevant skill with read_skill. If that workflow or the task can benefit from a locally configured MCP server, use list_mcp_servers and list_mcp_tools before call_mcp_tool. Do not request or expose downstream MCP secret values."
     }
   );
 
@@ -238,6 +238,87 @@ export function buildMcpServer(userSub: string, store: Store, hub: AgentHub): Mc
       timeoutSeconds
     }));
 
+  tools.register("list_skills", {
+    title: "List Codex skills",
+    description: "Lists Codex-compatible skills visible on a paired device. Only skill metadata is returned; use read_skill to load instructions when needed.",
+    inputSchema: z.object({
+      device: z.string().uuid(),
+      cwd: z.string().min(1).optional()
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: meta("Finding skills…", "Skills ready")
+  }, async ({ device, cwd }) =>
+    withDevice(userSub, device, store, hub, "list_skills", {
+      ...(cwd === undefined ? {} : { cwd })
+    }));
+
+  tools.register("read_skill", {
+    title: "Read Codex skill",
+    description: "Loads one Codex-compatible SKILL.md plus optional OpenAI metadata and resource names from a paired device.",
+    inputSchema: z.object({
+      device: z.string().uuid(),
+      path: z.string().min(1)
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: meta("Reading skill…", "Skill ready")
+  }, async ({ device, path }) =>
+    withDevice(userSub, device, store, hub, "read_skill", { path }));
+
+  tools.register("list_mcp_servers", {
+    title: "List device MCP servers",
+    description: "Lists Codex MCP server configurations visible on a paired device without returning secret environment or header values. Local MCP execution must be enabled on the agent.",
+    inputSchema: z.object({
+      device: z.string().uuid(),
+      cwd: z.string().min(1).optional()
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: meta("Reading MCP configuration…", "MCP servers ready")
+  }, async ({ device, cwd }) =>
+    withDevice(userSub, device, store, hub, "list_mcp_servers", {
+      ...(cwd === undefined ? {} : { cwd })
+    }));
+
+  tools.register("list_mcp_tools", {
+    title: "List tools from a device MCP server",
+    description: "Connects to one locally configured MCP server on a paired device and returns the tools it exposes. Supports STDIO and Streamable HTTP configurations.",
+    inputSchema: z.object({
+      device: z.string().uuid(),
+      server: z.string().min(1),
+      cwd: z.string().min(1).optional()
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    _meta: meta("Connecting to MCP server…", "MCP tools ready")
+  }, async ({ device, server: mcpServer, cwd }) =>
+    withDevice(userSub, device, store, hub, "list_mcp_tools", {
+      server: mcpServer,
+      ...(cwd === undefined ? {} : { cwd })
+    }));
+
+  tools.register("call_mcp_tool", {
+    title: "Call tool on a device MCP server",
+    description: "Calls a named tool on a locally configured MCP server through the paired device. The remote MCP tool may read, write, execute code, or access external services according to that server's own capabilities.",
+    inputSchema: z.object({
+      device: z.string().uuid(),
+      server: z.string().min(1),
+      tool: z.string().min(1),
+      arguments: z.record(z.string(), z.unknown()).default({}),
+      cwd: z.string().min(1).optional()
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true,
+      idempotentHint: false
+    },
+    _meta: meta("Calling MCP tool…", "MCP tool finished")
+  }, async ({ device, server: mcpServer, tool, arguments: toolArguments, cwd }) =>
+    withDevice(userSub, device, store, hub, "call_mcp_tool", {
+      server: mcpServer,
+      tool,
+      arguments: toolArguments,
+      ...(cwd === undefined ? {} : { cwd })
+    }));
+
   tools.installListCompatibility();
   return server;
 }
@@ -255,7 +336,18 @@ async function withDevice(
     const device = store.getDeviceForUser(userSub, deviceId);
     if (!device) throw new Error("Device not found");
     release = acquireUserDeviceSlot(userSub);
-    const result = await hub.call(device.id, kind, params);
+    const mcpBridgeKinds = new Set<Parameters<AgentHub["call"]>[1]>([
+      "list_mcp_tools",
+      "call_mcp_tool"
+    ]);
+    const result = await hub.call(
+      device.id,
+      kind,
+      params,
+      mcpBridgeKinds.has(kind)
+        ? config.MCP_AGENT_REQUEST_TIMEOUT_MS
+        : config.AGENT_REQUEST_TIMEOUT_MS
+    );
     return text(result);
   } catch (error) {
     return errorResult(error);

@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   AUTH_JWKS_URL: z.string().url(),
   AUTH_REQUIRED_SCOPE: z.string().min(1).default("remote:use"),
   AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  MCP_AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(300000),
   MAX_PENDING_AGENT_REQUESTS: z.coerce.number().int().min(16).max(4096).default(256),
   MAX_PENDING_AGENT_REQUESTS_PER_DEVICE: z.coerce.number().int().min(1).max(64).default(8),
   MAX_AGENT_CONNECTIONS: z.coerce.number().int().min(1).max(10000).default(1000),

@@ -17,7 +17,7 @@ if (command === "pair") {
 } else {
   console.error("Usage:");
   console.error("  range-remote-agent pair --server URL --code CODE --name NAME --unrestricted");
-  console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell] [--allow-sensitive-files]");
+  console.error("  range-remote-agent pair --server URL --code CODE --name NAME --root PATH [--root PATH] [--allow-shell] [--allow-sensitive-files] [--allow-mcp]");
   console.error("  range-remote-agent start");
   console.error("  range-remote-agent status");
   process.exit(2);
@@ -36,20 +36,20 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
   const roots = (flags.get("root") ?? []).map((root) => {
     const absolute = resolve(root);
     const stat = statSync(absolute);
-    if (!stat.isDirectory()) throw new Error(`Allowed root is not a directory: ${absolute}`);
+    if (!stat.isDirectory()) throw new Error("Allowed root is not a directory: " + absolute);
     return realpathSync(absolute);
   });
   if (!unrestricted && roots.length === 0) {
     throw new Error("At least one --root is required unless --unrestricted is used");
   }
 
-  const response = await fetch(`${server}/agent/pair`, {
+  const response = await fetch(server + "/agent/pair", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ code, name })
   });
 
-  if (!response.ok) throw new Error(`Pairing failed: HTTP ${response.status}`);
+  if (!response.ok) throw new Error("Pairing failed: HTTP " + response.status);
   const payload = await response.json() as { deviceId: string; deviceToken: string };
 
   const config: AgentConfig = {
@@ -61,6 +61,7 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
     allowedRoots: roots,
     allowShell: unrestricted || flags.has("allow-shell"),
     allowSensitiveFiles: unrestricted || flags.has("allow-sensitive-files"),
+    allowMcp: unrestricted || flags.has("allow-mcp"),
     maxReadBytes: 1_048_576,
     maxWriteBytes: 524_288,
     maxCommandOutputBytes: 262_144,
@@ -70,8 +71,8 @@ async function pair(flags: Map<string, string[]>): Promise<void> {
   saveConfig(config);
   console.error(
     unrestricted
-      ? `Paired ${name} in unrestricted mode. Config saved to ${configPath}`
-      : `Paired ${name}. Config saved to ${configPath}`
+      ? "Paired " + name + " in unrestricted mode. Config saved to " + configPath
+      : "Paired " + name + ". Config saved to " + configPath
   );
 }
 
@@ -85,6 +86,7 @@ function status(): void {
     allowedRoots: config.allowedRoots,
     allowShell: config.allowShell,
     allowSensitiveFiles: config.allowSensitiveFiles,
+    allowMcp: config.allowMcp,
     paired: Boolean(config.deviceId && config.deviceToken)
   }, null, 2));
 }
@@ -107,13 +109,13 @@ async function start(): Promise<void> {
 async function connectOnce(config: AgentConfig, wsUrl: URL): Promise<void> {
   await new Promise<void>((resolvePromise, reject) => {
     const ws = new WebSocket(wsUrl, {
-      headers: { authorization: `Bearer ${config.deviceToken}` }
+      headers: { authorization: "Bearer " + config.deviceToken }
     });
 
     ws.on("open", () => console.error(
       config.unrestricted
-        ? `Connected as ${config.name} (unrestricted local access)`
-        : `Connected as ${config.name}`
+        ? "Connected as " + config.name + " (unrestricted local access)"
+        : "Connected as " + config.name
     ));
 
     ws.on("message", async (raw) => {
@@ -148,17 +150,22 @@ async function connectOnce(config: AgentConfig, wsUrl: URL): Promise<void> {
 
 function parseArgs(args: string[]): Map<string, string[]> {
   const result = new Map<string, string[]>();
-  const booleanFlags = new Set(["allow-shell", "allow-sensitive-files", "unrestricted"]);
+  const booleanFlags = new Set([
+    "allow-shell",
+    "allow-sensitive-files",
+    "allow-mcp",
+    "unrestricted"
+  ]);
   for (let i = 0; i < args.length; i++) {
     const item = args[i]!;
-    if (!item.startsWith("--")) throw new Error(`Unexpected argument: ${item}`);
+    if (!item.startsWith("--")) throw new Error("Unexpected argument: " + item);
     const key = item.slice(2);
     if (booleanFlags.has(key)) {
       result.set(key, ["true"]);
       continue;
     }
     const value = args[++i];
-    if (!value || value.startsWith("--")) throw new Error(`Missing value for --${key}`);
+    if (!value || value.startsWith("--")) throw new Error("Missing value for --" + key);
     result.set(key, [...(result.get(key) ?? []), value]);
   }
   return result;
@@ -166,6 +173,6 @@ function parseArgs(args: string[]): Map<string, string[]> {
 
 function required(flags: Map<string, string[]>, key: string): string {
   const value = flags.get(key)?.at(-1);
-  if (!value) throw new Error(`Missing --${key}`);
+  if (!value) throw new Error("Missing --" + key);
   return value;
 }

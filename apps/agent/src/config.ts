@@ -8,12 +8,17 @@ export const configPath =
   join(homedir(), ".config", "range-remote", "config.json");
 
 export function loadConfig(): AgentConfig {
-  return AgentConfigSchema.parse(JSON.parse(readFileSync(configPath, "utf8")));
+  const raw = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+  const parsed = AgentConfigSchema.parse(raw);
+  if (!("allowMcp" in raw) && parsed.unrestricted) {
+    return { ...parsed, allowMcp: true };
+  }
+  return parsed;
 }
 
 export function saveConfig(config: AgentConfig): void {
   mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   try {
     chmodSync(configPath, 0o600);
   } catch {
