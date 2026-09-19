@@ -315,20 +315,62 @@ else:
 tools_conn.close()
 tools_list = tools_json.get("result", {}).get("tools", [])
 tool_names = {tool.get("name") for tool in tools_list}
-for required in {"list_devices", "read_file", "write_file", "run_command"}:
+for required in {"profile", "list_devices", "read_file", "write_file", "run_command"}:
     assert required in tool_names, (required, tool_names)
 for tool in tools_list:
     assert tool.get("securitySchemes"), tool
     assert tool.get("annotations") is not None, tool
 
+profile_descriptor = next(tool for tool in tools_list if tool.get("name") == "profile")
+assert profile_descriptor.get("_meta", {}).get("openai/profile") is True, profile_descriptor
+profile_schema = profile_descriptor.get("outputSchema", {})
+assert profile_schema.get("required") == ["id"], profile_schema
+assert profile_schema.get("additionalProperties") is False, profile_schema
+
+profile_conn = http.client.HTTPConnection("127.0.0.1", MCP_PORT, timeout=5)
+profile_conn.request(
+    "POST",
+    "/mcp",
+    body=json.dumps({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {"name": "profile", "arguments": {}},
+    }),
+    headers=tools_headers,
+)
+profile_res = profile_conn.getresponse()
+profile_data = profile_res.read()
+assert profile_res.status == 200, (profile_res.status, profile_data[:500])
+profile_content_type = profile_res.getheader("Content-Type", "")
+if profile_content_type.startswith("text/event-stream"):
+    profile_lines = [
+        line[5:].strip()
+        for line in profile_data.decode().splitlines()
+        if line.startswith("data:")
+    ]
+    assert profile_lines, profile_data[:500]
+    profile_json = json.loads(profile_lines[-1])
+else:
+    profile_json = json.loads(profile_data)
+profile_conn.close()
+profile_result = profile_json.get("result", {})
+profile_structured = profile_result.get("structuredContent", {})
+assert isinstance(profile_structured.get("id"), str) and profile_structured["id"].strip(), profile_result
+
 print(json.dumps({
     "dcr": True,
     "pkce": True,
+    "refresh_token": True,
     "resource_audience": claims["aud"],
     "scope": scope,
     "id_token": {
         "sub_present": bool(id_claims.get("sub")),
         "email_matches": id_claims["email"] == email,
+    },
+    "profile": {
+        "schema": True,
+        "structured_id": True,
     },
     "mcp_initialize": True,
 }, indent=2))

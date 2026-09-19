@@ -93,7 +93,7 @@ npm run dev:agent -- start
 
 ## Production
 
-The MCP endpoint is `/mcp`. The recommended production layout uses two stable HTTPS origins: one for the MCP relay (for example `https://remote.example.com`) and one for the authorization issuer (for example `https://auth.example.com`). `docker-compose.yml` runs both services as non-root containers with separate persistent volumes and attaches them to the external `cloudflare` network. For ChatGPT publication, verify the MCP domain, prepare review credentials, and keep a review device online.
+The MCP endpoint is `/mcp`. The tested production layout uses two stable HTTPS origins: one for the MCP relay (for example `https://remote.example.com`) and one for the authorization issuer (for example `https://auth.example.com`). A single-origin deployment is also possible behind a path-aware reverse proxy, but only when every OAuth discovery, registration, authorization, token, JWKS, interaction, and MCP route is mapped to the correct backend and the configured issuer/resource origins remain consistent. `docker-compose.yml` runs both services as non-root containers with separate persistent volumes and attaches them to the external `cloudflare` network. For ChatGPT publication, verify the MCP domain, prepare review credentials, and keep a review device online.
 
 See `docs/SUBMISSION.md`.
 

@@ -10,6 +10,7 @@ type ToolConfig = {
   title: string;
   description: string;
   inputSchema?: z.ZodType;
+  outputSchema?: z.ZodType;
   annotations?: {
     title?: string;
     readOnlyHint?: boolean;
@@ -25,6 +26,7 @@ type ToolDescriptor = {
   title: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   annotations?: ToolConfig["annotations"];
   securitySchemes: OAuthSecurityScheme[];
   _meta: Record<string, unknown>;
@@ -52,6 +54,7 @@ export function createOpenAiToolRegistry(
         title: config.title,
         description: config.description,
         inputSchema: config.inputSchema,
+        outputSchema: config.outputSchema,
         annotations: config.annotations,
         _meta: meta
       } as any,
@@ -61,12 +64,16 @@ export function createOpenAiToolRegistry(
     const inputSchema = config.inputSchema
       ? z.toJSONSchema(config.inputSchema)
       : { type: "object", properties: {}, additionalProperties: false };
+    const outputSchema = config.outputSchema
+      ? z.toJSONSchema(config.outputSchema)
+      : undefined;
 
     descriptors.push({
       name,
       title: config.title,
       description: config.description,
       inputSchema: inputSchema as Record<string, unknown>,
+      ...(outputSchema ? { outputSchema: outputSchema as Record<string, unknown> } : {}),
       ...(config.annotations ? { annotations: config.annotations } : {}),
       securitySchemes,
       _meta: meta
