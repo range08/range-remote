@@ -7,6 +7,30 @@ function esc(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
+export const interactionSubmitGuardScript = `
+(() => {
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (form.dataset.rrSubmitting === "1") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+
+    form.dataset.rrSubmitting = "1";
+    form.setAttribute("aria-busy", "true");
+
+    queueMicrotask(() => {
+      for (const control of form.querySelectorAll('button[type="submit"],input[type="submit"]')) {
+        control.setAttribute("aria-disabled", "true");
+        control.style.pointerEvents = "none";
+      }
+    });
+  }, true);
+})();
+`;
+
 function page(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -14,6 +38,7 @@ function page(title: string, body: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Range Remote</title>
+<script src="/auth/ui.js" defer></script>
 <style>
 body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f6f7f9;color:#15171a;margin:0}
 main{max-width:480px;margin:8vh auto;padding:24px}
